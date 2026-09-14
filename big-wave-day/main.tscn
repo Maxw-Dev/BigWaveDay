@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://dwmixspvi1dgt"]
+
+[sub_resource type="Environment" id="Environment_7dm0k"]
+
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_ig7tw"]
+
+[sub_resource type="Compositor" id="Compositor_0xm2m"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_7dm0k"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_7dm0k"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ig7tw"]
+size = Vector3(30, 1, 30)
+
+[sub_resource type="BoxMesh" id="BoxMesh_0xm2m"]
+size = Vector3(30, 1, 30)
+
+[node name="main" type="Node3D" unique_id=499967784]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1944493228]
+environment = SubResource("Environment_7dm0k")
+camera_attributes = SubResource("CameraAttributesPractical_ig7tw")
+compositor = SubResource("Compositor_0xm2m")
+
+[node name="Player" type="CharacterBody3D" parent="." unique_id=2138431766]
+
+[node name="PlayerCollider" type="CollisionShape3D" parent="Player" unique_id=51994351]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_7dm0k")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Player" unique_id=1475843083]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
+mesh = SubResource("CapsuleMesh_7dm0k")
+
+[node name="Camera3D" type="Camera3D" parent="Player" unique_id=187730565]
+transform = Transform3D(1, 0, 0, 0, 0.9396926, 0.34202012, 0, -0.34202012, 0.9396926, 0, 4, -7)
+current = true
+fov = 128.2
+
+[node name="GreyBox" type="Node3D" parent="." unique_id=1815654076]
+
+[node name="FlatGround" type="StaticBody3D" parent="GreyBox" unique_id=1628061090]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GreyBox/FlatGround" unique_id=340767408]
+shape = SubResource("BoxShape3D_ig7tw")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="GreyBox/FlatGround" unique_id=1071899829]
+mesh = SubResource("BoxMesh_0xm2m")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1932338934]
+transform = Transform3D(1, 0, 0, 0, 0.087155804, 0.9961947, 0, -0.9961947, 0.087155804, 0, 20, 0)
+light_energy = 0.852
