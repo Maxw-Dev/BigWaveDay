@@ -1,10 +1,7 @@
-[gd_resource type="Resource" script_class="WaveShape" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WaveShape" format=3 uid="uid://0dvty766wx48"]
 
-[ext_resource type="Script" path="res://scripts/wave_shape.gd" id="1_shape"]
+[ext_resource type="Script" uid="uid://bahgmg3hqy0du" path="res://scripts/wave_shape.gd" id="1_shape"]
 
 [resource]
 script = ExtResource("1_shape")
-radius = 6.0
-max_angle_deg = 100.0
-length = 500.0
-flat_extent = 30.0
+radius = 7.0

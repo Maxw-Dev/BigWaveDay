@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://dpw0ld6t5cx2w"]
+[gd_scene format=3 uid="uid://dw68j75ddqfhx"]
 
 [ext_resource type="Script" uid="uid://b65j0t7dec4ey" path="res://scripts/surf_prototype.gd" id="1_run"]
 [ext_resource type="PackedScene" path="res://scenes/wave.tscn" id="2_wave"]
@@ -21,32 +21,33 @@ sky = SubResource("sky")
 ambient_light_source = 3
 ambient_light_energy = 1.1
 
-[node name="SurfPrototype" type="Node3D" unique_id=1058888068]
+[node name="SurfPrototypeRight" type="Node3D" unique_id=931974171]
 script = ExtResource("1_run")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=34064007]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=870496171]
 environment = SubResource("environment")
 
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=512476624]
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=910246588]
 transform = Transform3D(0.658505, 0.664541, -0.353209, 0, 0.469332, 0.883022, 0.752577, -0.581474, 0.309058, 0, 30, 0)
 shadow_enabled = true
 
-[node name="Wave" parent="." unique_id=1511581652 instance=ExtResource("2_wave")]
+[node name="Wave" parent="." unique_id=53516331 instance=ExtResource("2_wave")]
+direction = -1
+peel_speed = 6.5
 
-[node name="Surfer" parent="." unique_id=651234964 instance=ExtResource("3_surfer")]
+[node name="Surfer" parent="." unique_id=427484824 instance=ExtResource("3_surfer")]
 turn_rate = 140.0
 sharp_turn_rate = 375.0
-gravity = 9.5
 
-[node name="ChaseCamera" type="Camera3D" parent="." unique_id=1980096021]
+[node name="ChaseCamera" type="Camera3D" parent="." unique_id=1529458298]
 current = true
 fov = 60.0
 script = ExtResource("4_camera")
 
-[node name="DebugHud" type="CanvasLayer" parent="." unique_id=538605600]
+[node name="DebugHud" type="CanvasLayer" parent="." unique_id=612315023]
 script = ExtResource("5_hud")
 
-[node name="Label" type="Label" parent="DebugHud" unique_id=1871274461]
+[node name="Label" type="Label" parent="DebugHud" unique_id=1876761172]
 offset_left = 16.0
 offset_top = 12.0
 offset_right = 760.0

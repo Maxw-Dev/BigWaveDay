@@ -1,7 +1,6 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/surfer.gd" id="1_surfer"]
-[ext_resource type="Resource" path="res://resources/wave_shape_default.tres" id="2_shape"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_board"]
 size = Vector3(0.7, 0.14, 2.6)
@@ -18,7 +17,6 @@ albedo_color = Color(0.08, 0.08, 0.14, 1)
 
 [node name="Surfer" type="Node3D"]
 script = ExtResource("1_surfer")
-shape = ExtResource("2_shape")
 
 [node name="Board" type="MeshInstance3D" parent="."]
 material_override = SubResource("mat_board")
@@ -28,6 +26,18 @@ mesh = SubResource("BoxMesh_board")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
 material_override = SubResource("mat_rider")
 mesh = SubResource("CapsuleMesh_rider")
+
+[node name="Spray" type="CPUParticles3D" parent="Board"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 1.1)
+emitting = false
+
+[node name="SharpBurst" type="CPUParticles3D" parent="Board"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 1.1)
+emitting = false
+
+[node name="Wake" type="CPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0.9)
+emitting = false
 
 [node name="Trail" type="MeshInstance3D" parent="."]
 top_level = true

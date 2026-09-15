@@ -11,4 +11,4 @@ shape = ExtResource("2_shape")
 
 [node name="Ocean" type="MeshInstance3D" parent="."]
 
-[node name="Foam" type="MeshInstance3D" parent="."]
+[node name="CrashSpray" type="CPUParticles3D" parent="."]
