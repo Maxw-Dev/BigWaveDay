@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/wave.gd" id="1_wave"]
+[ext_resource type="Resource" path="res://resources/wave_shape_default.tres" id="2_shape"]
+
+[node name="Wave" type="Node3D"]
+script = ExtResource("1_wave")
+shape = ExtResource("2_shape")
+
+[node name="FaceMesh" type="MeshInstance3D" parent="."]
+
+[node name="Ocean" type="MeshInstance3D" parent="."]
+
+[node name="Foam" type="MeshInstance3D" parent="."]

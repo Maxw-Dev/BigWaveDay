@@ -1,0 +1,59 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/surf_prototype.gd" id="1_run"]
+[ext_resource type="PackedScene" path="res://scenes/wave.tscn" id="2_wave"]
+[ext_resource type="PackedScene" path="res://scenes/surfer.tscn" id="3_surfer"]
+[ext_resource type="Script" path="res://scripts/chase_camera.gd" id="4_camera"]
+[ext_resource type="Script" path="res://scripts/debug_hud.gd" id="5_hud"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_material"]
+sky_top_color = Color(0.2, 0.45, 0.85, 1)
+sky_horizon_color = Color(0.7, 0.82, 0.95, 1)
+ground_bottom_color = Color(0.1, 0.2, 0.35, 1)
+ground_horizon_color = Color(0.7, 0.82, 0.95, 1)
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_material")
+
+[sub_resource type="Environment" id="environment"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_energy = 0.8
+
+[node name="SurfPrototype" type="Node3D"]
+script = ExtResource("1_run")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("environment")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.658505, 0.664541, -0.353209, 0, 0.469332, 0.883022, 0.752577, -0.581474, 0.309058, 0, 30, 0)
+shadow_enabled = true
+
+[node name="Wave" parent="." instance=ExtResource("2_wave")]
+
+[node name="Surfer" parent="." instance=ExtResource("3_surfer")]
+
+[node name="ChaseCamera" type="Camera3D" parent="."]
+script = ExtResource("4_camera")
+target_path = NodePath("../Surfer")
+wave_path = NodePath("../Wave")
+current = true
+fov = 60.0
+
+[node name="DebugHud" type="CanvasLayer" parent="."]
+script = ExtResource("5_hud")
+surfer_path = NodePath("../Surfer")
+wave_path = NodePath("../Wave")
+run_path = NodePath("..")
+
+[node name="Label" type="Label" parent="DebugHud"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 760.0
+offset_bottom = 180.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 18
+text = "debug"
