@@ -1,43 +1,48 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene format=3 uid="uid://bfml7cboj7i4w"]
 
-[ext_resource type="Script" path="res://scripts/surfer.gd" id="1_surfer"]
+[ext_resource type="Script" uid="uid://ciuwb3v4tl73d" path="res://scripts/surfer.gd" id="1_surfer"]
+[ext_resource type="PackedScene" uid="uid://cxhhpgoepxe1x" path="res://models/Penguin.blend" id="2_qngto"]
+
+[sub_resource type="StandardMaterial3D" id="mat_board"]
+albedo_color = Color(1, 0.45, 0.05, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_board"]
 size = Vector3(0.7, 0.14, 2.6)
 
-[sub_resource type="StandardMaterial3D" id="mat_board"]
-albedo_color = Color(1, 0.45, 0.05, 1)
+[sub_resource type="StandardMaterial3D" id="mat_rider"]
+albedo_color = Color(0.08, 0.08, 0.14, 1)
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_rider"]
 radius = 0.32
 height = 1.5
 
-[sub_resource type="StandardMaterial3D" id="mat_rider"]
-albedo_color = Color(0.08, 0.08, 0.14, 1)
-
-[node name="Surfer" type="Node3D"]
+[node name="Surfer" type="Node3D" unique_id=712333290]
 script = ExtResource("1_surfer")
 
-[node name="Board" type="MeshInstance3D" parent="."]
+[node name="Board" type="MeshInstance3D" parent="." unique_id=1137501579]
 material_override = SubResource("mat_board")
 mesh = SubResource("BoxMesh_board")
 
-[node name="Rider" type="MeshInstance3D" parent="Board"]
+[node name="Penguin" parent="Board" unique_id=1307197294 instance=ExtResource("2_qngto")]
+transform = Transform3D(0.42, 0, 0, 0, 0.42, 0, 0, 0, 0.42, 0, 0.54, 0)
+
+[node name="Rider" type="MeshInstance3D" parent="Board" unique_id=152157216]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
+visible = false
 material_override = SubResource("mat_rider")
 mesh = SubResource("CapsuleMesh_rider")
 
-[node name="Spray" type="CPUParticles3D" parent="Board"]
+[node name="Spray" type="CPUParticles3D" parent="Board" unique_id=486560660]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 1.1)
 emitting = false
 
-[node name="SharpBurst" type="CPUParticles3D" parent="Board"]
+[node name="SharpBurst" type="CPUParticles3D" parent="Board" unique_id=2015481401]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 1.1)
 emitting = false
 
-[node name="Wake" type="CPUParticles3D" parent="."]
+[node name="Wake" type="CPUParticles3D" parent="." unique_id=1850976335]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0.9)
 emitting = false
 
-[node name="Trail" type="MeshInstance3D" parent="."]
+[node name="Trail" type="MeshInstance3D" parent="." unique_id=1518392326]
 top_level = true
