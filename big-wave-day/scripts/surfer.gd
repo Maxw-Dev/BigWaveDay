@@ -412,9 +412,3 @@ func _ensure_input_action() -> void:
 	var key := InputEventKey.new()
 	key.physical_keycode = KEY_SPACE
 	InputMap.action_add_event(ACTION, key)
-	var mouse := InputEventMouseButton.new()
-	mouse.button_index = MOUSE_BUTTON_LEFT
-	InputMap.action_add_event(ACTION, mouse)
-	var pad := InputEventJoypadButton.new()
-	pad.button_index = JOY_BUTTON_A
-	InputMap.action_add_event(ACTION, pad)

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b65j0t7dec4ey" path="res://scripts/surf_prototype.gd" id="1_run"]
 [ext_resource type="PackedScene" path="res://scenes/wave.tscn" id="2_wave"]
-[ext_resource type="PackedScene" path="res://scenes/surfer.tscn" id="3_surfer"]
+[ext_resource type="PackedScene" uid="uid://bfml7cboj7i4w" path="res://scenes/surfer.tscn" id="3_surfer"]
 [ext_resource type="Script" uid="uid://btydfpww0lrof" path="res://scripts/chase_camera.gd" id="4_camera"]
 [ext_resource type="Script" uid="uid://b8n6sxfpgr13x" path="res://scripts/debug_hud.gd" id="5_hud"]
 
@@ -43,6 +43,11 @@ sharp_turn_rate = 375.0
 current = true
 fov = 60.0
 script = ExtResource("4_camera")
+offset = Vector3(-4, 4, 3)
+look_ahead = 2.0
+look_up = 1.5
+smoothing = 4.0
+clearance = 1.25
 
 [node name="DebugHud" type="CanvasLayer" parent="." unique_id=612315023]
 script = ExtResource("5_hud")
