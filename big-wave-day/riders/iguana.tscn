@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://ek0c8cq8aq74"]
+
+[ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_8s43a"]
+[ext_resource type="PackedScene" uid="uid://cq317w87nxgrq" path="res://models/Iguana.blend" id="2_8s43a"]
+
+[node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
+script = ExtResource("1_8s43a")
+y_offset = 0.38
+scale_mod = 0.34
+rider_width = 1.0
+model = NodePath("Iguana")
+
+[node name="Iguana" parent="." unique_id=866921033 instance=ExtResource("2_8s43a")]

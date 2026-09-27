@@ -49,8 +49,13 @@ const ACTION := "surf"
 @export var board_width := 0.62
 @export var board_thickness := 0.1
 
+@export var rider_scenes: Array[PackedScene]
+
+
 @export_group("Debug")
 @export var trail_length := 120
+@export var override_rider: bool = false
+@export var override_rider_num: int = 0
 
 var pos := Vector2.ZERO
 var vel := Vector2.ZERO
@@ -71,7 +76,7 @@ var _trail_points := PackedVector3Array()
 var _trail_mesh := ImmediateMesh.new()
 
 @onready var board: Node3D = $Board
-@onready var rider: Node3D = $Board/Rider
+var rider: Rider
 @onready var spray: CPUParticles3D = $Board/Spray
 @onready var burst: CPUParticles3D = $Board/SharpBurst
 @onready var wake: CPUParticles3D = $Wake
@@ -90,7 +95,16 @@ func _ready() -> void:
 		return
 	if pump_curve == null:
 		pump_curve = _default_pump_curve()
-	_rider_rest_y = rider.position.y
+	
+	if override_rider:
+		rider = (rider_scenes[override_rider_num]).instantiate()
+	else:
+		rider = (rider_scenes[randi_range(0, len(rider_scenes)-1)]).instantiate()
+	board.add_child(rider)
+	
+	_rider_rest_y = rider.y_offset
+	board_width = rider.rider_width # maybe temporary
+	
 	board.scale = Vector3.ONE * visual_scale
 	wake.position *= visual_scale
 	if generate_board_mesh:
