@@ -29,6 +29,7 @@ environment = SubResource("environment")
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=910246588]
 transform = Transform3D(0.658505, 0.664541, -0.353209, 0, 0.469332, 0.883022, 0.752577, -0.581474, 0.309058, 0, 30, 0)
+light_color = Color(1, 1, 0.6313726, 1)
 shadow_enabled = true
 
 [node name="Wave" parent="." unique_id=53516331 instance=ExtResource("2_wave")]
@@ -43,11 +44,15 @@ sharp_turn_rate = 375.0
 current = true
 fov = 60.0
 script = ExtResource("4_camera")
-offset = Vector3(-4, 4, 3)
+face_h = 0.3
 look_ahead = 2.0
-look_up = 1.5
 smoothing = 4.0
-clearance = 1.25
+follow_back = 7.0
+follow_fov = 74.0
+barrel_enter = 7.0
+barrel_back = 5.0
+barrel_fov = 70.0
+barrel_transition = 1.0
 
 [node name="DebugHud" type="CanvasLayer" parent="." unique_id=612315023]
 script = ExtResource("5_hud")
