@@ -6,6 +6,7 @@ extends Node3D
 @export var rider_width: float = 0.62
 
 @export var model: Node3D
+@export var stats: RiderStats          ## Feel numbers for this rider. Null = keep the surfer's own values.
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:

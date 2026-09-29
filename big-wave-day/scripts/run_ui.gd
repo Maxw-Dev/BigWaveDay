@@ -1,0 +1,137 @@
+## Player-facing overlay: the drop-in prompt, timed hints, the end-of-wave card, and the fade.
+## Built in code so the layout cannot drift; the run script drives it.
+class_name RunUi
+extends CanvasLayer
+
+var _fade: ColorRect
+var _card: Control
+var _card_bg: ColorRect
+var _title: Label
+var _subtitle: Label
+var _highlights: Label
+var _continue: Label
+var _prompt: Label
+var _hint: Label
+var _hint_tween: Tween
+
+
+func _ready() -> void:
+	layer = 5
+	_fade = _full_rect(ColorRect.new())
+	_fade.color = Color(0.02, 0.05, 0.1, 1.0)
+	_fade.modulate.a = 0.0
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fade)
+
+	# Prompt: centred, pushed below the middle by a spacer so the rider stays clear.
+	var prompt_centre := CenterContainer.new()
+	_full_rect(prompt_centre)
+	prompt_centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(prompt_centre)
+	var prompt_box := VBoxContainer.new()
+	prompt_centre.add_child(prompt_box)
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 260)
+	prompt_box.add_child(spacer)
+	_prompt = _label(40, Color(1, 1, 1))
+	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_prompt.visible = false
+	prompt_box.add_child(_prompt)
+
+	# Hint: bottom centre.
+	var hint_margin := MarginContainer.new()
+	_full_rect(hint_margin)
+	hint_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint_margin.add_theme_constant_override("margin_bottom", 80)
+	add_child(hint_margin)
+	var hint_box := VBoxContainer.new()
+	hint_box.alignment = BoxContainer.ALIGNMENT_END
+	hint_margin.add_child(hint_box)
+	_hint = _label(28, Color(1, 0.95, 0.7))
+	_hint.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_hint.modulate.a = 0.0
+	hint_box.add_child(_hint)
+
+	_card = _full_rect(Control.new())
+	_card.visible = false
+	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_card)
+	_card_bg = _full_rect(ColorRect.new())
+	_card_bg.color = Color(0.0, 0.03, 0.08, 0.55)
+	_card_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card.add_child(_card_bg)
+	var centre := CenterContainer.new()
+	_full_rect(centre)
+	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_card.add_child(centre)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 14)
+	centre.add_child(box)
+	_title = _label(52, Color(1, 1, 1))
+	_subtitle = _label(24, Color(0.9, 0.95, 1.0))
+	_highlights = _label(24, Color(1, 1, 1))
+	_continue = _label(22, Color(0.8, 0.9, 1.0))
+	for l in [_title, _subtitle, _highlights, _continue]:
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(l)
+	_continue.modulate.a = 0.0
+
+
+func show_prompt(text: String) -> void:
+	_prompt.text = text
+	_prompt.visible = true
+
+
+func hide_prompt() -> void:
+	_prompt.visible = false
+
+
+func show_hint(text: String, seconds: float) -> void:
+	_hint.text = text
+	if _hint_tween != null:
+		_hint_tween.kill()
+	_hint_tween = create_tween()
+	_hint_tween.tween_property(_hint, "modulate:a", 1.0, 0.25)
+	_hint_tween.tween_interval(seconds)
+	_hint_tween.tween_property(_hint, "modulate:a", 0.0, 0.4)
+
+
+func show_card(title: String, colour: Color, subtitle: String, lines: PackedStringArray, continue_text: String, continue_after: float) -> void:
+	_title.text = title
+	_title.add_theme_color_override("font_color", colour)
+	_subtitle.text = subtitle
+	_highlights.text = "\n".join(lines)
+	_continue.text = continue_text
+	_continue.modulate.a = 0.0
+	_card.visible = true
+	_card.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(_card, "modulate:a", 1.0, 0.3)
+	tw.tween_interval(maxf(continue_after - 0.3, 0.0))
+	tw.tween_property(_continue, "modulate:a", 1.0, 0.3)
+
+
+func hide_card() -> void:
+	_card.visible = false
+
+
+func fade_to(alpha: float, seconds: float) -> Tween:
+	var tw := create_tween()
+	tw.tween_property(_fade, "modulate:a", alpha, seconds)
+	return tw
+
+
+func _full_rect(c: Control) -> Control:
+	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return c
+
+
+func _label(size: int, colour: Color) -> Label:
+	var l := Label.new()
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", colour)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	l.add_theme_constant_override("outline_size", 8)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l

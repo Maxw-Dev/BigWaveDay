@@ -2,9 +2,11 @@
 
 [ext_resource type="PackedScene" uid="uid://cxhhpgoepxe1x" path="res://models/Penguin.blend" id="1_36rbs"]
 [ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_prq75"]
+[ext_resource type="Resource" path="res://riders/stats_penguin.tres" id="9_stats"]
 
 [node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
 script = ExtResource("1_prq75")
+stats = ExtResource("9_stats")
 y_offset = 0.54
 scale_mod = 0.42
 model = NodePath("Penguin")

@@ -2,9 +2,11 @@
 
 [ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_5h4qj"]
 [ext_resource type="PackedScene" uid="uid://baasf27wlnskl" path="res://models/Basilisk.blend" id="2_5h4qj"]
+[ext_resource type="Resource" path="res://riders/stats_basilisk.tres" id="9_stats"]
 
 [node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
 script = ExtResource("1_5h4qj")
+stats = ExtResource("9_stats")
 y_offset = 0.38
 scale_mod = 0.34
 rider_width = 1.0

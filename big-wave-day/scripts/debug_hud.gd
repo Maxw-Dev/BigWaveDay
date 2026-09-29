@@ -34,9 +34,7 @@ func _process(_delta: float) -> void:
 	var k := wave.steepness(surfer.pos.x)
 	lines.append("height %3.0f%%   %s (steepness %.2f)   ahead of break %.1f m   face %.1f m tall here" % [
 		surfer.pos.y * 100.0, "POCKET" if k > 0.5 else "SHOULDER", k, surfer.pos.x - wave.foam_u, wave.shape.lip_height(wave.ahead_of_break(surfer.pos.x))])
+	lines.append("%s on a %s   carve %.0f deg/s   snap %.0f deg/s   drag %.3f" % [surfer.rider_name(), surfer.board_description(), surfer.turn_rate, surfer.sharp_turn_rate, surfer.drag])
 	lines.append("last wave: %s (%.1f s)" % [run.last_reason, run.last_wave_time])
 	lines.append("tap = flip turn   hold = sharp turn   [Space]")
-	if not surfer.is_live:
-		lines.append("")
-		lines.append(">>> press to drop in <<<")
 	label.text = "\n".join(lines)

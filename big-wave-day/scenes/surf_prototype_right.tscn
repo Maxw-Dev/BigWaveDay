@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://dw68j75ddqfhx"]
+[gd_scene format=3 uid="uid://b0mh1jogf8e1b"]
 
 [ext_resource type="Script" uid="uid://b65j0t7dec4ey" path="res://scripts/surf_prototype.gd" id="1_run"]
 [ext_resource type="PackedScene" path="res://scenes/wave.tscn" id="2_wave"]

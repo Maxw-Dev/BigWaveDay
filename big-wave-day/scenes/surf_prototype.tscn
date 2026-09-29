@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://scenes/surfer.tscn" id="3_surfer"]
 [ext_resource type="Script" uid="uid://btydfpww0lrof" path="res://scripts/chase_camera.gd" id="4_camera"]
 [ext_resource type="Script" uid="uid://b8n6sxfpgr13x" path="res://scripts/debug_hud.gd" id="5_hud"]
+[ext_resource type="Script" path="res://scripts/run_ui.gd" id="6_ui"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_material"]
 sky_top_color = Color(0.2, 0.45, 0.85, 1)
@@ -29,6 +30,7 @@ environment = SubResource("environment")
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=512476624]
 transform = Transform3D(0.658505, 0.664541, -0.353209, 0, 0.469332, 0.883022, 0.752577, -0.581474, 0.309058, 0, 30, 0)
+light_color = Color(1, 1, 0.6313726, 1)
 shadow_enabled = true
 
 [node name="Wave" parent="." unique_id=1511581652 instance=ExtResource("2_wave")]
@@ -42,6 +44,15 @@ gravity = 9.5
 current = true
 fov = 60.0
 script = ExtResource("4_camera")
+face_h = 0.3
+look_ahead = 2.0
+smoothing = 4.0
+follow_back = 7.0
+follow_fov = 74.0
+barrel_enter = 7.0
+barrel_back = 5.0
+barrel_fov = 70.0
+barrel_transition = 1.0
 
 [node name="DebugHud" type="CanvasLayer" parent="." unique_id=538605600]
 script = ExtResource("5_hud")
@@ -55,3 +66,6 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 18
 text = "debug"
+
+[node name="RunUi" type="CanvasLayer" parent="."]
+script = ExtResource("6_ui")
