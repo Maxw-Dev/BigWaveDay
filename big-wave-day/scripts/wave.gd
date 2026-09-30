@@ -118,6 +118,16 @@ func steepness(u: float) -> float:
 	return shape.steepness(ahead_of_break(u))
 
 
+func height_fraction_at_z(u: float, z: float) -> float:
+	# Which height fraction of the face sits at this world z, here along the wave. Flat water is negative.
+	var d := ahead_of_break(u)
+	if z >= 0.0:
+		return -z / shape.arc_length(d)
+	var r := shape.arc_radius(d)
+	var a := asin(clampf(-z / r, 0.0, 1.0))
+	return clampf(a / shape.lip_angle(d), 0.0, 1.0)
+
+
 func top_height(u: float) -> float:
 	# Highest point of the wave (lip, curl or whitewater) at this point along it.
 	return shape.top_height(ahead_of_break(u))

@@ -28,7 +28,7 @@ func _process(_delta: float) -> void:
 	lines.append("speed %.1f m/s   heading %+.0f deg   turning %s   %s   hold %.2f s" % [
 		surfer.speed(), surfer.heading_deg(),
 		"UP (toward lip)" if surfer.turn_dir == 1 else "DOWN (toward flats)",
-		"SHARP" if surfer.is_sharp else "carve",
+		("AIR %.1f m" % surfer.air_height) if surfer.airborne else ("SHARP" if surfer.is_sharp else "carve"),
 		surfer.hold_time])
 	lines.append("last pump %.2f   (%.1f s ago)" % [surfer.last_pump_quality, minf(surfer.time_since_pump, 99.9)])
 	var k := wave.steepness(surfer.pos.x)

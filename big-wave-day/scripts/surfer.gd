@@ -10,6 +10,10 @@ extends Node3D
 
 const ACTION := "surf"
 
+signal pumped(quality: float, gain: float)
+signal air_started(vertical_speed: float)
+signal air_landed(height: float, spin_deg: float, clean: bool)
+
 @export_node_path("Node3D") var wave_path: NodePath = ^"../Wave"   ## The Wave to ride. Geometry and direction come from it.
 @export var forgiving := false            ## Clamp s at the bottom too, so nothing ends the wave but the foam and the timer.
 @export var soft_lip := true              ## Going over the lip pins you to it and scrubs speed instead of ending the wave.
@@ -31,9 +35,10 @@ const ACTION := "surf"
 @export var flat_drag := 0.8              ## Linear drag per second on the flats (s <= 0). Makes bogging real.
 
 @export_group("Pumping")
-@export var pump_gain := 4.0              ## m/s added by a perfect pump.
+@export var pump_gain := 4.0              ## m/s added by a perfect pump, fed in over pump_ramp_seconds.
+@export var pump_ramp_seconds := 0.45     ## The boost comes in over this long after the flip, so it reads as acceleration, not a jolt.
 @export var pump_cooldown := 0.4          ## Spamming must never out-earn rhythm.
-@export var pump_curve: Curve             ## x: heading, 0 = straight down the face, 1 = straight up. y: quality 0..1.
+@export var pump_curve: Curve             ## x: heading at the flip, 0 = straight down the face, 1 = straight up. y: timing quality 0..1. Peaks on the top turn.
 @export var shoulder_pump_scale := 0.25   ## Pump gain multiplier out on the shoulder (1 in the pocket). The pocket is where speed comes from; the shoulder is for spending it.
 
 @export_group("Juice")
@@ -41,6 +46,17 @@ const ACTION := "surf"
 @export var spray_min_intensity := 8.0      ## Below this no spray, just the wake.
 @export var crouch_scale := 0.65             ## Rider height while holding a sharp turn.
 @export var wake_min_speed := 2.0
+
+@export_group("Airs")
+@export var airs_enabled := true
+@export var air_min_vertical := 1.5        ## m/s of climb at the lip needed to leave the face. Slower than this rides the lip instead.
+@export var air_gravity_scale := 1.6       ## Higher = shorter, snappier airs. 1.6 keeps a fast launch to about two metres above the lip.
+@export var air_land_h := 0.5              ## Height fraction of the face you come back down onto.
+@export var air_land_heading_deg := -20.0  ## Heading you land with: slightly down the line, so speed carries.
+@export var land_blend_seconds := 0.3      ## The board eases from its air orientation onto the face over this long.
+@export var air_spin_rate := 150.0         ## deg/s the board spins in the air while carving (a typical air is ~1.5 s, so about a 180). Tap flips the spin, hold spins faster.
+@export var air_sharp_spin_rate := 520.0
+@export var air_landing_keep := 0.9        ## Fraction of speed kept on landing.
 
 @export_group("Look")
 @export var visual_scale := 1.25             ## Board and rider size relative to the wave.
@@ -77,6 +93,8 @@ var is_live := false                      ## False until the first press on a fr
 var wave: Wave
 
 var _hold_armed := false                  ## A hold only counts after a fresh press (not one carried across a respawn).
+var _pump_left := 0.0                     ## m/s of pump boost still to feed in.
+var _pump_rate := 0.0                     ## m/s per second it feeds in at.
 var _forward := Vector3.RIGHT
 var _bank := 0.0
 var _trail_points := PackedVector3Array()
@@ -85,6 +103,24 @@ var _trail_mesh := ImmediateMesh.new()
 @onready var board: Node3D = $Board
 var rider: Rider
 var input_enabled := true                 ## The run turns this off while a wave is ending.
+var airborne := false
+var air_height := 0.0                     ## Metres above the water directly below, while airborne.
+var air_peak := 0.0
+var air_spin := 0.0                       ## Degrees spun this air.
+var _air_pos := Vector3.ZERO
+var _air_vel := Vector3.ZERO
+var _air_yaw := 0.0
+var _air_launch_y := 0.0
+var _air_t := 0.0
+var _air_T := 1.0
+var _air_vy := 0.0
+var _air_vx := 0.0
+var _air_x0 := 0.0
+var _air_z0 := 0.0
+var _air_speed0 := 0.0
+var _land_blend := 0.0
+var _land_from_forward := Vector3.RIGHT
+var _land_from_up := Vector3.UP
 var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
 var _rider_index := -1
 @onready var spray: CPUParticles3D = $Board/Spray
@@ -195,10 +231,15 @@ func reset(p: Vector2, v: Vector2) -> void:
 	hold_time = 0.0
 	is_sharp = false
 	is_live = false
+	airborne = false
+	air_height = 0.0
+	air_peak = 0.0
+	air_spin = 0.0
 	_hold_armed = false
 	pump_timer = 0.0
 	last_pump_quality = 0.0
 	time_since_pump = 999.0
+	_pump_left = 0.0
 	_bank = 0.0
 	_was_sharp = false
 	_forward = wave.along()
@@ -220,8 +261,9 @@ func _physics_process(delta: float) -> void:
 		_hold_armed = true
 		if is_live:
 			turn_dir = -turn_dir
-			_try_pump()
-			_flip_splash()
+			if not airborne:
+				_try_pump()
+				_flip_splash()
 		else:
 			is_live = true   # First press on a fresh wave drops in without flipping: the first arc is a climb.
 	if input_enabled and _hold_armed and Input.is_action_pressed(ACTION):
@@ -231,10 +273,27 @@ func _physics_process(delta: float) -> void:
 		is_sharp = false
 		hold_time = 0.0
 
+	if airborne:
+		_air_step(delta)
+		_update_bank(delta)
+		_update_trail()
+		_update_juice(delta)
+		return
+
 	if is_live:
 		# 2. Steer: rotate the velocity. The board always points where it travels.
 		var rate := deg_to_rad(sharp_turn_rate if is_sharp else turn_rate)
 		vel = vel.rotated(turn_dir * rate * delta)
+
+		# 2b. Feed the pump boost in gradually after the top turn, along the heading as it comes back down.
+		# Flipping back up early abandons whatever boost was left.
+		if _pump_left > 0.0:
+			if turn_dir != -1:
+				_pump_left = 0.0
+			else:
+				var dose := minf(_pump_rate * delta, _pump_left)
+				vel += vel.normalized() * dose
+				_pump_left -= dose
 
 		# 3. Gravity along the face: zero on the flats, full g on a vertical section.
 		var g_along := gravity * gravity_scale * sin(wave.slope_angle(pos.x, pos.y))
@@ -249,6 +308,12 @@ func _physics_process(delta: float) -> void:
 	# 5. Integrate. Vertical metres become a height fraction of the local face.
 	pos.x += vel.x * delta
 	pos.y += vel.y * delta / wave.arc_length(pos.x)
+	if pos.y > 1.0 and airs_enabled and is_live and vel.y > air_min_vertical and wave.steepness(pos.x) > 0.05:
+		_launch_air()
+		_update_bank(delta)
+		_update_trail()
+		_update_juice(delta)
+		return
 	if soft_lip and pos.y > 1.0:
 		pos.y = 1.0
 		vel.y = minf(vel.y, 0.0)
@@ -258,6 +323,7 @@ func _physics_process(delta: float) -> void:
 		pos.y = minf(pos.y, 1.0)
 	pump_timer = maxf(pump_timer - delta, 0.0)
 	time_since_pump += delta
+	_land_blend = maxf(_land_blend - delta, 0.0)
 
 	# 6. Write to 3D.
 	_update_bank(delta)
@@ -269,18 +335,99 @@ func _physics_process(delta: float) -> void:
 func _try_pump() -> void:
 	if pump_timer > 0.0 or vel.length() < 0.5:
 		return
-	# Quality comes from the heading at the moment of the flip: flipping while climbing is a pump.
+	# Quality is pure timing, from the heading at the moment of the flip: flipping near the top of a steep
+	# climb is the pump.
 	var t := (rad_to_deg(vel.angle()) + 90.0) / 180.0
 	var quality := pump_curve.sample(clampf(t, 0.0, 1.0))
 	var where := lerpf(shoulder_pump_scale, 1.0, wave.steepness(pos.x))
-	vel += vel.normalized() * pump_gain * quality * where
+	var gain := pump_gain * quality * where
+	_pump_left = gain
+	_pump_rate = gain / maxf(pump_ramp_seconds, 0.05)
 	last_pump_quality = quality
 	time_since_pump = 0.0
 	pump_timer = pump_cooldown
+	if quality > 0.05:
+		pumped.emit(quality, gain)
+
+
+func pump_readiness() -> float:
+	# How good a tap right now would be, 0..1. Only meaningful while climbing toward the lip.
+	if not is_live or airborne or turn_dir != 1 or vel.y <= 0.0 or vel.length() < 0.5:
+		return 0.0
+	var t := (rad_to_deg(vel.angle()) + 90.0) / 180.0
+	return pump_curve.sample(clampf(t, 0.0, 1.0)) * lerpf(shoulder_pump_scale, 1.0, wave.steepness(pos.x))
+
+
+func _launch_air() -> void:
+	# Leave the lip on a designed arc: real ballistics up and down, but the sideways drift is steered so you
+	# always come back onto the face at air_land_h. That is what the wave moving under you does in real life.
+	pos.y = 1.0
+	_air_pos = wave.world_point(pos.x, 1.0)
+	_air_launch_y = _air_pos.y
+	_pump_left = 0.0
+	_air_x0 = _air_pos.x
+	_air_z0 = _air_pos.z
+	_air_vy = vel.y
+	_air_vx = vel.x
+	_air_speed0 = vel.length()
+	var g := gravity * air_gravity_scale
+	var land_y := wave.world_point(pos.x, air_land_h).y
+	var drop := maxf(_air_launch_y - land_y, 0.0)
+	_air_T = (_air_vy + sqrt(_air_vy * _air_vy + 2.0 * g * drop)) / g
+	_air_t = 0.0
+	_air_vel = wave.along() * _air_vx + Vector3.UP * _air_vy
+	_air_yaw = 0.0
+	air_spin = 0.0
+	air_peak = 0.0
+	air_height = 0.0
+	airborne = true
+	burst.direction = Vector3(0.0, 1.0, 0.4)
+	burst.restart()
+	air_started.emit(vel.y)
+
+
+func _air_step(delta: float) -> void:
+	_air_t += delta
+	var g := gravity * air_gravity_scale
+	var rate := deg_to_rad(air_sharp_spin_rate if is_sharp else air_spin_rate)
+	var step := turn_dir * rate * delta
+	_air_yaw += step
+	air_spin += absf(rad_to_deg(step))
+	var u := (_air_x0 + _air_vx * _air_t * wave.direction) * wave.direction
+	pos.x = u
+	var land := wave.world_point(u, air_land_h)
+	var k := smoothstep(0.0, 1.0, _air_t / _air_T)
+	_air_pos = Vector3(u * wave.direction, _air_launch_y + _air_vy * _air_t - 0.5 * g * _air_t * _air_t, lerpf(_air_z0, land.z, k))
+	_air_vel = Vector3(wave.direction * _air_vx, _air_vy - g * _air_t, 0.0)
+	air_height = maxf(_air_pos.y - _air_launch_y, 0.0)
+	air_peak = maxf(air_peak, air_height)
+	if _air_t >= _air_T:
+		_land(u)
+		return
+	var forward := wave.along().rotated(Vector3.UP, _air_yaw)
+	global_transform = Transform3D(Basis.looking_at(forward, Vector3.UP), _air_pos)
+
+
+func _land(u: float) -> void:
+	# Back on the face halfway up, heading slightly down the line, with most of your speed. The board's
+	# orientation eases over from the air pose instead of snapping.
+	airborne = false
+	_land_from_forward = -global_transform.basis.z
+	_land_from_up = global_transform.basis.y
+	_land_blend = land_blend_seconds
+	pos = Vector2(u, air_land_h)
+	var heading := deg_to_rad(air_land_heading_deg)
+	vel = Vector2(cos(heading), sin(heading)) * _air_speed0 * air_landing_keep
+	turn_dir = 1   # Landing sets you up climbing, which reads as a natural recovery.
+	_apply_to_transform()
+	flip_splash.initial_velocity_min = 3.0
+	flip_splash.initial_velocity_max = 6.0
+	flip_splash.restart()
+	air_landed.emit(air_peak, air_spin, true)
 
 
 func speed() -> float:
-	return vel.length()
+	return _air_vel.length() if airborne else vel.length()
 
 
 func heading_deg() -> float:
@@ -309,7 +456,16 @@ func _apply_to_transform() -> void:
 	if _forward.length_squared() < 1e-6:
 		_forward = wave.along()
 	_forward = _forward.normalized()
-	global_transform = Transform3D(Basis.looking_at(_forward, n), wave.world_point(pos.x, pos.y))
+	var fwd := _forward
+	var up := n
+	if _land_blend > 0.0:
+		var k := 1.0 - _land_blend / land_blend_seconds
+		fwd = _land_from_forward.slerp(_forward, k).normalized()
+		up = _land_from_up.slerp(n, k).normalized()
+		if absf(fwd.dot(up)) > 0.99:
+			fwd = _forward
+			up = n
+	global_transform = Transform3D(Basis.looking_at(fwd, up), wave.world_point(pos.x, pos.y))
 
 
 func _update_trail() -> void:
@@ -326,7 +482,7 @@ func _update_trail() -> void:
 
 
 func _update_juice(delta: float) -> void:
-	var rate := deg_to_rad(sharp_turn_rate if is_sharp else turn_rate) if is_live else 0.0
+	var rate := deg_to_rad(sharp_turn_rate if is_sharp else turn_rate) if (is_live and not airborne) else 0.0
 	var intensity := clampf((speed() * rate - spray_min_intensity) / (spray_full_intensity - spray_min_intensity), 0.0, 1.5)
 	# Spray fan off the rail, thrown to the outside of the turn. Size follows how hard you are turning.
 	var outward := float(wave.direction * turn_dir)
@@ -337,7 +493,7 @@ func _update_juice(delta: float) -> void:
 	spray.scale_amount_min = 0.4 + 0.5 * intensity
 	spray.scale_amount_max = 0.8 + 0.9 * intensity
 	# Foamy wake dropped on the water behind the board: the cheapest way to say "this is water".
-	wake.emitting = is_live and speed() > wake_min_speed
+	wake.emitting = is_live and not airborne and speed() > wake_min_speed
 	# Sharp turn: one big splash on entry, and the rider crouches while it lasts.
 	if is_sharp and not _was_sharp:
 		burst.direction = Vector3(outward * 0.8, 0.7, 0.4)

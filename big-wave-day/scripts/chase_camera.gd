@@ -20,7 +20,7 @@ extends Camera3D
 @export var follow_back := 11.0                 ## Metres behind the surfer, down the line, out on the open face. The "how far away" knob.
 @export var follow_depth := 4.0                 ## Metres off the face toward the flats. A little more than in the barrel keeps the angle similar from further back.
 @export var follow_fov := 72.0
-@export var fov_per_speed := 0.5                ## Degrees of extra FOV per m/s of surfer speed. Cheap sense of speed. Fades out in the barrel.
+@export var fov_per_speed := 1.0                ## Degrees of extra FOV per m/s of surfer speed. Cheap sense of speed. Fades out in the barrel.
 
 @export_group("Barrel")
 @export var barrel_enter := 6.0                 ## Surfer this close to the break (metres ahead of it): camera zooms in.
