@@ -22,6 +22,7 @@ extends Node3D
 const FACE_SHADER := preload("res://shaders/water_face.gdshader")
 
 var foam_u := 0.0                        ## Position of the break along the wave, metres.
+var _faces := {}                         ## direction -> MeshInstance3D. Both are built once; only one is shown.
 var _face_mat: ShaderMaterial
 var _ocean_mat: StandardMaterial3D
 
@@ -33,7 +34,12 @@ var _ocean_mat: StandardMaterial3D
 func _ready() -> void:
 	if shape == null:
 		shape = WaveShape.new()
-	_build_face()
+	_faces[1] = _build_face(1, face_mesh)
+	var right := MeshInstance3D.new()
+	right.name = "FaceMeshRight"
+	add_child(right)
+	_faces[-1] = _build_face(-1, right)
+	set_direction(direction)
 	_setup_ocean()
 	_setup_crash_spray()
 	reset()
@@ -41,6 +47,22 @@ func _ready() -> void:
 
 func reset() -> void:
 	foam_u = 0.0
+	_place()
+
+
+func set_direction(dir: int) -> void:
+	# Switch between the prebuilt left and right faces. Cheap enough to do every wave.
+	direction = dir
+	for d in _faces:
+		var mi: MeshInstance3D = _faces[d]
+		var active: bool = d == dir
+		mi.visible = active
+		for child in mi.get_children():
+			if child is StaticBody3D:
+				child.collision_layer = 1 if active else 0
+				child.collision_mask = 1 if active else 0
+	if _faces.has(dir):
+		face_mesh = _faces[dir]
 	_place()
 
 
@@ -108,7 +130,7 @@ func lip_top(u: float) -> float:
 
 # ---- visuals ----
 
-func _build_face() -> void:
+func _build_face(dir: int, mi: MeshInstance3D) -> MeshInstance3D:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var nu := int(ceil((shape.length + shape.back_extent) / u_step))
@@ -129,7 +151,7 @@ func _build_face() -> void:
 			var p := shape.local_point(d, h)
 			# Vertex colour carries: r = foam on the outside, g = fold (tube ceiling), b = lip tip.
 			st.set_color(Color(shape.foam_amount(d, h), shape.fold_amount(d, h), shape.tip_amount(d, h), 1.0))
-			st.add_vertex(Vector3(p.x * direction, p.y, p.z))
+			st.add_vertex(Vector3(p.x * dir, p.y, p.z))
 	var stride := rows + 1
 	for i in range(nu):
 		for j in range(rows):
@@ -139,14 +161,23 @@ func _build_face() -> void:
 			var e := c + 1
 			# Godot treats clockwise triangles as front faces. Wind them clockwise as seen from the rider's side;
 			# mirroring X flips handedness, so a right-hander uses the opposite order.
-			if direction > 0:
+			if dir > 0:
 				st.add_index(a); st.add_index(b); st.add_index(c)
 				st.add_index(b); st.add_index(e); st.add_index(c)
 			else:
 				st.add_index(a); st.add_index(c); st.add_index(b)
 				st.add_index(b); st.add_index(c); st.add_index(e)
 	st.generate_normals()
-	face_mesh.mesh = st.commit()
+	mi.mesh = st.commit()
+	if _face_mat == null:
+		_face_mat = _make_face_material()
+	mi.material_override = _face_mat
+	if generate_collision:
+		mi.create_trimesh_collision()
+	return mi
+
+
+func _make_face_material() -> ShaderMaterial:
 	_face_mat = ShaderMaterial.new()
 	_face_mat.shader = FACE_SHADER
 	_face_mat.set_shader_parameter("base_color", face_color)
@@ -154,9 +185,7 @@ func _build_face() -> void:
 	_face_mat.set_shader_parameter("water_scroll", water_scroll)
 	_face_mat.set_shader_parameter("band_length", band_length)
 	_face_mat.set_shader_parameter("band_shade", band_shade)
-	face_mesh.material_override = _face_mat
-	if generate_collision:
-		face_mesh.create_trimesh_collision()
+	return _face_mat
 
 
 func _setup_ocean() -> void:

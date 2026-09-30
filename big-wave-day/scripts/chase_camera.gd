@@ -13,7 +13,8 @@ extends Camera3D
 @export var look_ahead := 1.5                   ## Metres ahead of the surfer along the wave to aim at.
 @export var look_up := 2.5                      ## Aim above the rider so the lip folding overhead stays in frame.
 @export var smoothing := 6.0                    ## Per second. Higher = tighter follow.
-@export var break_margin := 0.5                 ## The camera never drops further back than this many metres ahead of the break, so it cannot end up in the whitewater.
+@export var break_margin := 3.0                 ## The camera never drops further back than this many metres ahead of the break, so it never sits in the collapsing section.
+@export var clamp_out := 0.6                    ## Extra metres of depth per metre the clamp pushed the camera forward, so it drifts out of the tube's mouth instead of into the wall.
 
 @export_group("Follow")
 @export var follow_back := 11.0                 ## Metres behind the surfer, down the line, out on the open face. The "how far away" knob.
@@ -91,7 +92,9 @@ func _rig_position(w: float) -> Vector3:
 	var depth := lerpf(follow_depth, barrel_depth, w)
 	if wave == null:
 		return target.global_position + Vector3(-back * _dir(), look_up, depth)
-	var cam_u := maxf(_surfer_u() - back, wave.foam_u + break_margin)
+	var want_u := _surfer_u() - back
+	var cam_u := maxf(want_u, wave.foam_u + break_margin)
+	depth += clampf((cam_u - want_u) * clamp_out, 0.0, 3.0)
 	return wave.world_point(cam_u, face_h) + wave.normal(cam_u, face_h) * depth
 
 

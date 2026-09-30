@@ -50,6 +50,13 @@ const ACTION := "surf"
 @export var board_thickness := 0.1
 
 @export var rider_scenes: Array[PackedScene]
+@export var new_rider_every_wave := true      ## Off: keep the first animal for the whole session, only the colours re-roll.
+@export_group("Board feel from length")
+@export var turn_ref_length := 2.7            ## The board length at which turn_rate and sharp_turn_rate apply as written.
+@export var turn_length_exponent := 1.3       ## Carve rate scales by (ref / length) ^ this. 1.3: a 3.2 m gun carves ~20% slower, a 2.2 m fish ~30% faster.
+@export var sharp_length_exponent := 1.2      ## Snap rate scales by (ref / length) ^ this.
+@export var deck_colors: Array[Color] = [Color(1.0, 0.45, 0.05), Color(0.95, 0.85, 0.2), Color(0.2, 0.75, 0.55), Color(0.9, 0.3, 0.35), Color(0.35, 0.55, 0.95), Color(0.95, 0.95, 0.9), Color(0.55, 0.3, 0.75)]
+@export var stripe_colors: Array[Color] = [Color(0.1, 0.1, 0.12), Color(0.98, 0.98, 0.98), Color(0.9, 0.2, 0.2), Color(0.1, 0.4, 0.9)]
 
 
 @export_group("Debug")
@@ -77,12 +84,19 @@ var _trail_mesh := ImmediateMesh.new()
 
 @onready var board: Node3D = $Board
 var rider: Rider
+var input_enabled := true                 ## The run turns this off while a wave is ending.
+var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
+var _rider_index := -1
 @onready var spray: CPUParticles3D = $Board/Spray
 @onready var burst: CPUParticles3D = $Board/SharpBurst
+@onready var flip_splash: CPUParticles3D = $Board/FlipSplash
 @onready var wake: CPUParticles3D = $Wake
 @onready var trail: MeshInstance3D = $Trail
 
 var _rider_rest_y := 0.0
+var _base_board_length := 2.7
+var _base_turn_rate := 140.0
+var _base_sharp_rate := 375.0
 var _was_sharp := false
 
 
@@ -95,21 +109,13 @@ func _ready() -> void:
 		return
 	if pump_curve == null:
 		pump_curve = _default_pump_curve()
-	
-	if override_rider:
-		rider = (rider_scenes[override_rider_num]).instantiate()
-	else:
-		rider = (rider_scenes[randi_range(0, len(rider_scenes)-1)]).instantiate()
-	board.add_child(rider)
-	
-	_rider_rest_y = rider.y_offset
-	board_width = rider.rider_width # maybe temporary
-	
+	_base_board_length = board_length
+	_base_turn_rate = turn_rate
+	_base_sharp_rate = sharp_turn_rate
 	board.scale = Vector3.ONE * visual_scale
 	wake.position *= visual_scale
-	if generate_board_mesh:
-		_setup_board()
 	_setup_particles()
+	spawn_rider()
 	trail.top_level = true
 	trail.mesh = _trail_mesh
 	var mat := StandardMaterial3D.new()
@@ -117,6 +123,69 @@ func _ready() -> void:
 	mat.albedo_color = Color(1.0, 0.55, 0.1)
 	trail.material_override = mat
 	reset(Vector2(12.0, 0.5), Vector2(8.0, 0.0))
+
+
+func spawn_rider() -> void:
+	# Called every wave. A fresh animal (random unless overridden) brings its own board shape and feel;
+	# the board's colours are re-rolled regardless.
+	if rider != null and not new_rider_every_wave:
+		if generate_board_mesh:
+			_setup_board()
+		return
+	if rider != null:
+		rider.queue_free()
+		rider = null
+	if rider_scenes.is_empty():
+		push_warning("Surfer: no rider scenes assigned")
+		return
+	var index := override_rider_num
+	if not override_rider:
+		# Random, but never the same animal twice in a row, so the variety is visible.
+		var choices: Array[int] = []
+		for i in range(rider_scenes.size()):
+			if i != _rider_index or rider_scenes.size() == 1:
+				choices.append(i)
+		index = choices.pick_random()
+	index = clampi(index, 0, rider_scenes.size() - 1)
+	_rider_index = index
+	rider = rider_scenes[index].instantiate()
+	board.add_child(rider)
+	_rider_rest_y = rider.y_offset
+	rider.position.y = _rider_rest_y
+	board_width = rider.rider_width
+	board_length = _base_board_length
+	_apply_stats(rider.stats)
+	if generate_board_mesh:
+		_setup_board()
+
+
+func _apply_stats(stats: RiderStats) -> void:
+	if stats == null:
+		return
+	board_length = stats.board_length
+	board_width = stats.board_width
+	drag = stats.drag
+	pump_gain = stats.pump_gain
+	# Turning comes from the board: longer boards carve and snap slower, in wider arcs.
+	var ratio := turn_ref_length / maxf(board_length, 0.5)
+	turn_rate = _base_turn_rate * pow(ratio, turn_length_exponent) * stats.agility
+	sharp_turn_rate = _base_sharp_rate * pow(ratio, sharp_length_exponent) * stats.agility
+
+
+func rider_name() -> String:
+	if rider != null and rider.model != null:
+		return rider.model.name
+	return "Rider"
+
+
+func board_description() -> String:
+	# Quoted at real-board scale (before visual_scale), so a gun reads as 10'6", not 13'.
+	var metres: float = board_look.get("length", board_length)
+	var inches := int(round(metres / 0.0254))
+	var style := "board"
+	if rider != null and rider.stats != null:
+		style = rider.stats.style_name
+	return "%d'%d\" %s %s" % [inches / 12, inches % 12, board_look.get("name", ""), style]
 
 
 func reset(p: Vector2, v: Vector2) -> void:
@@ -146,15 +215,16 @@ func reset(p: Vector2, v: Vector2) -> void:
 
 func _physics_process(delta: float) -> void:
 	# 1. Input. The flip lands on the same tick as the press; nothing is buffered or locked out.
-	if Input.is_action_just_pressed(ACTION):
+	if input_enabled and Input.is_action_just_pressed(ACTION):
 		hold_time = 0.0
 		_hold_armed = true
 		if is_live:
 			turn_dir = -turn_dir
 			_try_pump()
+			_flip_splash()
 		else:
 			is_live = true   # First press on a fresh wave drops in without flipping: the first arc is a climb.
-	if _hold_armed and Input.is_action_pressed(ACTION):
+	if input_enabled and _hold_armed and Input.is_action_pressed(ACTION):
 		hold_time += delta
 		is_sharp = hold_time >= sharp_hold_threshold
 	else:
@@ -280,9 +350,25 @@ func _update_juice(delta: float) -> void:
 
 
 func _setup_board() -> void:
-	board.mesh = _build_board_mesh(board_length, board_width, board_thickness)
+	# Roll a look: deck colour, an optional centre stripe, a contrasting nose, and a little length variation.
+	var deck: Color = deck_colors.pick_random() if not deck_colors.is_empty() else Color(1.0, 0.45, 0.05)
+	var stripe: Color = stripe_colors.pick_random() if not stripe_colors.is_empty() else Color.BLACK
+	var names := {"orange": Color(1.0, 0.45, 0.05), "yellow": Color(0.95, 0.85, 0.2), "green": Color(0.2, 0.75, 0.55), "red": Color(0.9, 0.3, 0.35), "blue": Color(0.35, 0.55, 0.95), "white": Color(0.95, 0.95, 0.9), "purple": Color(0.55, 0.3, 0.75)}
+	var deck_name := ""
+	for n in names:
+		if names[n].is_equal_approx(deck):
+			deck_name = n
+	board_look = {"deck": deck, "stripe": stripe, "has_stripe": randf() < 0.6, "tip": stripe if randf() < 0.5 else deck.darkened(0.3),
+		"length": board_length, "name": deck_name}
+	board.mesh = _build_board_mesh(board_look.length, board_width, board_thickness)
+	for child in board.get_children():
+		if child.name == "Fin":
+			child.queue_free()
 	if board.material_override is BaseMaterial3D:
-		(board.material_override as BaseMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+		var m := board.material_override as BaseMaterial3D
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.albedo_color = Color.WHITE
+		m.vertex_color_use_as_albedo = true
 	var fin := MeshInstance3D.new()
 	fin.name = "Fin"
 	var prism := PrismMesh.new()
@@ -291,7 +377,7 @@ func _setup_board() -> void:
 	fin.mesh = prism
 	# PrismMesh points up along +Y; hang it under the tail, raked back.
 	fin.rotation_degrees = Vector3(180.0, 0.0, 0.0)
-	fin.position = Vector3(0.0, -board_thickness * 0.5 - 0.11, board_length * 0.34)
+	fin.position = Vector3(0.0, -board_thickness * 0.5 - 0.11, board_look.get("length", board_length) * 0.34)
 	var fin_mat := StandardMaterial3D.new()
 	fin_mat.albedo_color = Color(0.1, 0.1, 0.12)
 	fin_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -314,6 +400,12 @@ func _build_board_mesh(length: float, width: float, thick: float) -> ArrayMesh:
 		var rocker := 0.045 * length * pow(absf(t - 0.45) / 0.55, 2.2)
 		for j in range(n_around):
 			var a := TAU * float(j) / n_around
+			var col: Color = board_look.get("deck", Color(1.0, 0.45, 0.05))
+			if t > 0.86:
+				col = board_look.get("tip", col)
+			elif board_look.get("has_stripe", false) and sin(a) > 0.0 and absf(cos(a)) < 0.28:
+				col = board_look.get("stripe", col)
+			st.set_color(col)
 			st.add_vertex(Vector3(cos(a) * half_w, sin(a) * half_t + rocker, z))
 	for i in range(n_len):
 		for j in range(n_around):
@@ -345,6 +437,17 @@ func _board_outline(t: float) -> float:
 func _board_thickness(t: float) -> float:
 	var q := (t - 0.5) / 0.5
 	return maxf(sqrt(maxf(1.0 - q * q, 0.0)), 0.12)
+
+
+func _flip_splash() -> void:
+	# A small splash on every direction switch, scaled by speed. The sharp-turn burst stays bigger.
+	if speed() < 3.0:
+		return
+	var k := clampf(speed() / 10.0, 0.3, 1.5)
+	flip_splash.initial_velocity_min = 1.5 * k
+	flip_splash.initial_velocity_max = 4.0 * k
+	flip_splash.direction = Vector3(float(wave.direction * turn_dir) * 0.6, 0.8, 0.5)
+	flip_splash.restart()
 
 
 func _setup_particles() -> void:
@@ -387,6 +490,19 @@ func _setup_particles() -> void:
 	burst.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 	burst.emission_sphere_radius = 0.3
 
+	flip_splash.mesh = drop
+	flip_splash.amount = 26
+	flip_splash.lifetime = 0.45
+	flip_splash.one_shot = true
+	flip_splash.explosiveness = 1.0
+	flip_splash.spread = 50.0
+	flip_splash.gravity = Vector3(0.0, -9.8, 0.0)
+	flip_splash.scale_amount_min = 0.5
+	flip_splash.scale_amount_max = 1.0
+	flip_splash.color_ramp = fade
+	flip_splash.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	flip_splash.emission_sphere_radius = 0.25
+
 	var foam_mesh := SphereMesh.new()
 	foam_mesh.radius = 0.16
 	foam_mesh.height = 0.08
@@ -423,6 +539,13 @@ func _ensure_input_action() -> void:
 	if InputMap.has_action(ACTION):
 		return
 	InputMap.add_action(ACTION)
+	# Still one button, on three devices: Space, left mouse (touch emulates the mouse on phones), gamepad A.
 	var key := InputEventKey.new()
 	key.physical_keycode = KEY_SPACE
 	InputMap.action_add_event(ACTION, key)
+	var mouse := InputEventMouseButton.new()
+	mouse.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event(ACTION, mouse)
+	var pad := InputEventJoypadButton.new()
+	pad.button_index = JOY_BUTTON_A
+	InputMap.action_add_event(ACTION, pad)
