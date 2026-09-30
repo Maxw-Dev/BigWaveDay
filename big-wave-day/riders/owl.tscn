@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://bidku8mn1dwvt"]
+
+[ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_lcynx"]
+[ext_resource type="Resource" uid="uid://bbu114jf2h6l2" path="res://riders/stats_owl.tres" id="2_lcynx"]
+[ext_resource type="PackedScene" uid="uid://x6l0xcevehu4" path="res://models/Owl.blend" id="3_lcynx"]
+
+[node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
+script = ExtResource("1_lcynx")
+y_offset = 0.5
+scale_mod = 0.42
+model = NodePath("Owl")
+stats = ExtResource("2_lcynx")
+
+[node name="Owl" parent="." unique_id=1074415171 instance=ExtResource("3_lcynx")]

@@ -1,12 +1,7 @@
-[gd_resource type="Resource" script_class="RiderStats" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="RiderStats" format=3 uid="uid://cylp8yj5jm5ru"]
 
-[ext_resource type="Script" path="res://riders/rider_stats.gd" id="1_stats"]
+[ext_resource type="Script" uid="uid://cb5xch4yldqwi" path="res://riders/rider_stats.gd" id="1_stats"]
 
 [resource]
 script = ExtResource("1_stats")
 style_name = "shortboard"
-board_length = 2.7
-board_width = 0.62
-agility = 1.0
-drag = 0.02
-pump_gain = 4.0
