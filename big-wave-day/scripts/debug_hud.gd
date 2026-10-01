@@ -12,7 +12,14 @@ var run: SurfPrototype
 @onready var label: Label = $Label
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
+		visible = not visible
+
+
 func _ready() -> void:
+	# Dev readout only. Hidden by default; F3 toggles it.
+	visible = false
 	surfer = get_node_or_null(surfer_path) as Surfer
 	wave = get_node_or_null(wave_path) as Wave
 	run = get_node_or_null(run_path) as SurfPrototype
@@ -21,7 +28,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if surfer == null or wave == null or run == null:
+	if not visible or surfer == null or wave == null or run == null:
 		return
 	var lines := PackedStringArray()
 	lines.append("Wave %d (%s)   %.1f s left of %.1f s" % [run.wave_count, "LEFT" if wave.direction > 0 else "RIGHT", maxf(run.time_left, 0.0), run.wave_duration])

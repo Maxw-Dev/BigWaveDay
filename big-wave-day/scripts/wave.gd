@@ -16,7 +16,7 @@ extends Node3D
 @export var face_color := Color(0.15, 0.45, 0.75)
 @export var water_scroll := Vector2(0.0, -0.06)   ## UV drift per second. Water draws up the face on a real wave.
 @export var band_length := 5.0           ## World-anchored shade bands every N metres along the wave, so the rider's travel reads.
-@export var band_shade := 0.85
+@export var band_shade := 1.0            ## 1 = no bands. The sections and chop carry the motion now; set lower to bring the debug bands back.
 @export var ocean_color := Color(0.05, 0.22, 0.42)
 
 const FACE_SHADER := preload("res://shaders/water_face.gdshader")
@@ -160,7 +160,7 @@ func _build_face(dir: int, mi: MeshInstance3D) -> MeshInstance3D:
 				h = 1.0 + float(j - flat_rows - face_rows) / curl_rows
 			var p := shape.local_point(d, h)
 			# Vertex colour carries: r = foam on the outside, g = fold (tube ceiling), b = lip tip.
-			st.set_color(Color(shape.foam_amount(d, h), shape.fold_amount(d, h), shape.tip_amount(d, h), 1.0))
+			st.set_color(Color(shape.foam_amount(d, h), shape.fold_amount(d, h), shape.tip_amount(d, h), clampf(h, 0.0, 1.0)))
 			st.add_vertex(Vector3(p.x * dir, p.y, p.z))
 	var stride := rows + 1
 	for i in range(nu):

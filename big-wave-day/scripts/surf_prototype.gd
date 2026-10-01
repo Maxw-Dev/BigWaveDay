@@ -21,7 +21,7 @@ enum State { RIDING, ENDING, CARD, STARTING }
 @export var card_auto_seconds := 5.0  ## The card dismisses itself after this.
 @export var card_hold_toggle := 0.8   ## Holding this long on the card toggles endless mode.
 @export var fade_seconds := 0.35
-@export var show_first_wave_hints := true
+@export var show_first_wave_hints := false  ## Text hints on the first wave. Off: the game shows, it does not tell.
 
 var state := State.RIDING
 var wave_count := 0
@@ -197,40 +197,20 @@ func _update_feel_overlays() -> void:
 	ui.set_speed_lines(clampf((spd - 7.0) / 5.0, 0.0, 1.0) * 0.75 if riding else 0.0)
 	if wind != null:
 		wind.set_speed(spd if riding else 0.0)
-	var anchor := surfer.global_position + Vector3(0.0, 2.4, 0.0)
-	var show := riding and surfer.is_live and not camera.is_position_behind(anchor)
-	ui.update_pump_ring(camera.unproject_position(anchor), surfer.pump_readiness(), show)
 
 
-func _screen_at_rider() -> Vector2:
-	return camera.unproject_position(surfer.global_position + Vector3(0.0, 2.0, 0.0))
 
-
-func _on_pumped(quality: float, gain: float) -> void:
-	if state != State.RIDING:
-		return
-	var text := "PUMP +%.1f" % gain
-	if quality >= 0.8:
-		text = "PERFECT PUMP +%.1f" % gain
-	var colour := Color(0.75, 0.9, 1.0).lerp(Color(1.0, 0.85, 0.2), clampf((quality - 0.3) / 0.5, 0.0, 1.0))
-	ui.popup(text, _screen_at_rider(), int(22 + 30 * quality), colour)
+func _on_pumped(_quality: float, _gain: float) -> void:
+	pass   # Feedback lives in the world now (gold spray), not on the screen.
 
 
 func _on_air_started(_vertical: float) -> void:
-	if state == State.RIDING:
-		ui.popup("AIR!", _screen_at_rider(), 34, Color(1, 1, 1))
+	pass
 
 
-func _on_air_landed(height: float, spin_deg: float, clean: bool) -> void:
+func _on_air_landed(height: float, _spin_deg: float, _clean: bool) -> void:
 	air_count += 1
 	biggest_air = maxf(biggest_air, height)
-	if state != State.RIDING:
-		return
-	var text := "%.1f m AIR" % height
-	var spins := int(round(spin_deg / 180.0)) * 180
-	if spins >= 180:
-		text += "  %d°" % spins
-	ui.popup(text, _screen_at_rider(), 30, Color(1.0, 0.85, 0.2))
 
 
 func _restart() -> void:

@@ -29,6 +29,11 @@ extends Resource
 @export var whitewater_height := 4.0                     ## Height of the whitewater mound just behind the break.
 @export var whitewater_fade := 25.0                      ## Metres behind the break over which the mound fades to flat water.
 
+@export_group("Sections")
+@export var section_height := 0.12                       ## Lip height varies by this fraction along the wave, so it rolls instead of ruling a straight line.
+@export var section_angle_deg := 7.0                     ## Steepness varies by this many degrees along the wave.
+@export var section_length := 30.0                       ## Metres per main section.
+
 @export_group("Extents")
 @export var length := 400.0                              ## Metres of wave rendered ahead of the break.
 @export var back_extent := 40.0                          ## Metres rendered behind the break.
@@ -51,11 +56,21 @@ func broken(d: float) -> float:
 	return smoothstep(0.0, -crash_length, d) if d < 0.0 else 0.0
 
 
+func section(d: float) -> float:
+	# -1..1 undulation along the wave: a long swell of sections with a shorter ripple on top. Fades out
+	# inside the curl zone so the barrel stays clean, and behind the break.
+	if d <= 0.0:
+		return 0.0
+	var w := TAU / section_length
+	var s := 0.65 * sin(d * w) + 0.35 * sin(d * w * 2.7 + 1.3)
+	return s * smoothstep(0.0, curl_reach, d)
+
+
 func lip_height(d: float) -> float:
 	if d < 0.0:
 		var mound := whitewater_height * clampf(1.0 + d / whitewater_fade, 0.0, 1.0)
 		return maxf(lerpf(pocket_height, mound, broken(d)), 0.05)
-	return lerpf(shoulder_height, pocket_height, steepness(d))
+	return lerpf(shoulder_height, pocket_height, steepness(d)) * (1.0 + section_height * section(d))
 
 
 func lip_angle(d: float) -> float:
@@ -63,7 +78,7 @@ func lip_angle(d: float) -> float:
 	# off into a semicircular mound (180 degrees).
 	if d < 0.0:
 		return lerpf(deg_to_rad(max_angle_deg), PI, broken(d))
-	return deg_to_rad(lerpf(shoulder_angle_deg, max_angle_deg, steepness(d)))
+	return deg_to_rad(lerpf(shoulder_angle_deg, max_angle_deg, steepness(d)) + section_angle_deg * section(d))
 
 
 func curl_angle(d: float) -> float:

@@ -14,34 +14,9 @@ var _prompt: Label
 var _hint: Label
 var _hint_tween: Tween
 var _speed_lines: ColorRect
-var _ring: PumpRing
 var _mode: Label
 
 const SPEED_SHADER := preload("res://shaders/speed_lines.gdshader")
-
-
-## Fills as a tap becomes worth more; flashes when it is worth taking.
-class PumpRing extends Control:
-	var readiness := 0.0
-	var pulse := 0.0
-
-	func _process(delta: float) -> void:
-		pulse += delta * 8.0
-		queue_redraw()
-
-	func _draw() -> void:
-		var c := Vector2.ZERO
-		var hot := readiness >= 0.72
-		draw_arc(c, 30.0, 0.0, TAU, 40, Color(1, 1, 1, 0.18), 7.0, true)
-		if readiness > 0.02:
-			var col := Color(0.55, 0.9, 1.0, 0.85).lerp(Color(1.0, 0.85, 0.2, 1.0), clampf((readiness - 0.4) / 0.4, 0.0, 1.0))
-			if hot:
-				col = col.lerp(Color.WHITE, 0.5 + 0.5 * sin(pulse))
-			draw_arc(c, 30.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(readiness, 0.0, 1.0), 40, col, 7.0, true)
-		if hot:
-			var font := ThemeDB.fallback_font
-			draw_string_outline(font, Vector2(-40.0, 8.0), "TAP", HORIZONTAL_ALIGNMENT_CENTER, 80.0, 24, 6, Color(0, 0, 0, 1))
-			draw_string(font, Vector2(-40.0, 8.0), "TAP", HORIZONTAL_ALIGNMENT_CENTER, 80.0, 24, Color(1, 1, 1, 1))
 
 
 func _ready() -> void:
@@ -53,10 +28,6 @@ func _ready() -> void:
 	sm.shader = SPEED_SHADER
 	_speed_lines.material = sm
 	add_child(_speed_lines)
-	_ring = PumpRing.new()
-	_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ring.visible = false
-	add_child(_ring)
 	_fade = _full_rect(ColorRect.new())
 	_fade.color = Color(0.02, 0.05, 0.1, 1.0)
 	_fade.modulate.a = 0.0
@@ -165,30 +136,6 @@ func set_speed_lines(strength: float) -> void:
 	(_speed_lines.material as ShaderMaterial).set_shader_parameter("strength", clampf(strength, 0.0, 1.0))
 
 
-func update_pump_ring(screen_pos: Vector2, readiness: float, show: bool) -> void:
-	_ring.visible = show and readiness > 0.02
-	_ring.position = screen_pos
-	_ring.readiness = readiness
-
-
-var _popup_stack := 0
-var _popup_last := 0.0
-
-
-func popup(text: String, screen_pos: Vector2, size: int, colour: Color) -> void:
-	# A label that floats up and fades. Fire and forget. Popups within half a second stack upward.
-	var now := Time.get_ticks_msec() / 1000.0
-	_popup_stack = _popup_stack + 1 if now - _popup_last < 0.5 else 0
-	_popup_last = now
-	var l := _label(size, colour)
-	l.text = text
-	add_child(l)
-	l.reset_size()
-	l.position = screen_pos - Vector2(l.size.x * 0.5, l.size.y * 0.5) - Vector2(0.0, 44.0 * _popup_stack)
-	var tw := create_tween().set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 80.0, 0.9).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_ease(Tween.EASE_IN)
-	tw.chain().tween_callback(l.queue_free)
 
 
 func fade_to(alpha: float, seconds: float) -> Tween:

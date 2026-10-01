@@ -36,7 +36,8 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 
 @export_group("Pumping")
 @export var pump_gain := 4.0              ## m/s added by a perfect pump, fed in over pump_ramp_seconds.
-@export var pump_ramp_seconds := 0.45     ## The boost comes in over this long after the flip, so it reads as acceleration, not a jolt.
+@export var pump_ramp_seconds := 0.3      ## The fed-in part of the boost arrives over this long after the flip.
+@export var pump_instant_fraction := 0.5  ## This much of the boost lands at the flip itself (it is what launches airs); the rest feeds in.
 @export var pump_cooldown := 0.4          ## Spamming must never out-earn rhythm.
 @export var pump_curve: Curve             ## x: heading at the flip, 0 = straight down the face, 1 = straight up. y: timing quality 0..1. Peaks on the top turn.
 @export var shoulder_pump_scale := 0.25   ## Pump gain multiplier out on the shoulder (1 in the pocket). The pocket is where speed comes from; the shoulder is for spending it.
@@ -45,12 +46,14 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 @export var spray_full_intensity := 60.0    ## speed (m/s) x turn rate (rad/s) that makes a full-size spray fan. A sharp turn at 10 m/s is ~73.
 @export var spray_min_intensity := 8.0      ## Below this no spray, just the wake.
 @export var crouch_scale := 0.65             ## Rider height while holding a sharp turn.
+@export var pump_glow_color := Color(1.0, 0.82, 0.25)  ## Spray and wake tint after a good pump, fading back to white.
+@export var pump_glow_seconds := 1.2
 @export var wake_min_speed := 2.0
 
 @export_group("Airs")
 @export var airs_enabled := true
 @export var air_min_vertical := 1.5        ## m/s of climb at the lip needed to leave the face. Slower than this rides the lip instead.
-@export var air_gravity_scale := 1.6       ## Higher = shorter, snappier airs. 1.6 keeps a fast launch to about two metres above the lip.
+@export var air_gravity_scale := 1.0       ## Airs under normal gravity: a fast launch goes three-plus metres over the lip. Raise to shorten.
 @export var air_land_h := 0.5              ## Height fraction of the face you come back down onto.
 @export var air_land_heading_deg := -20.0  ## Heading you land with: slightly down the line, so speed carries.
 @export var land_blend_seconds := 0.3      ## The board eases from its air orientation onto the face over this long.
@@ -69,8 +72,8 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 @export var new_rider_every_wave := true      ## Off: keep the first animal for the whole session, only the colours re-roll.
 @export_group("Board feel from length")
 @export var turn_ref_length := 2.7            ## The board length at which turn_rate and sharp_turn_rate apply as written.
-@export var turn_length_exponent := 1.3       ## Carve rate scales by (ref / length) ^ this. 1.3: a 3.2 m gun carves ~20% slower, a 2.2 m fish ~30% faster.
-@export var sharp_length_exponent := 1.2      ## Snap rate scales by (ref / length) ^ this.
+@export var turn_length_exponent := 0.8       ## Carve rate scales by (ref / length) ^ this. 0.8: a 3.1 m gun carves ~11% slower, a 2.3 m fish ~14% faster.
+@export var sharp_length_exponent := 0.7      ## Snap rate scales by (ref / length) ^ this.
 @export var deck_colors: Array[Color] = [Color(1.0, 0.45, 0.05), Color(0.95, 0.85, 0.2), Color(0.2, 0.75, 0.55), Color(0.9, 0.3, 0.35), Color(0.35, 0.55, 0.95), Color(0.95, 0.95, 0.9), Color(0.55, 0.3, 0.75)]
 @export var stripe_colors: Array[Color] = [Color(0.1, 0.1, 0.12), Color(0.98, 0.98, 0.98), Color(0.9, 0.2, 0.2), Color(0.1, 0.4, 0.9)]
 
@@ -93,6 +96,7 @@ var is_live := false                      ## False until the first press on a fr
 var wave: Wave
 
 var _hold_armed := false                  ## A hold only counts after a fresh press (not one carried across a respawn).
+var _pump_glow := 0.0                     ## 0..1, how recently and how well you pumped. Drives the gold spray.
 var _pump_left := 0.0                     ## m/s of pump boost still to feed in.
 var _pump_rate := 0.0                     ## m/s per second it feeds in at.
 var _forward := Vector3.RIGHT
@@ -126,6 +130,9 @@ var _rider_index := -1
 @onready var spray: CPUParticles3D = $Board/Spray
 @onready var burst: CPUParticles3D = $Board/SharpBurst
 @onready var flip_splash: CPUParticles3D = $Board/FlipSplash
+@onready var pump_burst: CPUParticles3D = $Board/PumpBurst
+@onready var air_trail: CPUParticles3D = $Board/AirTrail
+@onready var land_ring: CPUParticles3D = $LandRing
 @onready var wake: CPUParticles3D = $Wake
 @onready var trail: MeshInstance3D = $Trail
 
@@ -341,13 +348,22 @@ func _try_pump() -> void:
 	var quality := pump_curve.sample(clampf(t, 0.0, 1.0))
 	var where := lerpf(shoulder_pump_scale, 1.0, wave.steepness(pos.x))
 	var gain := pump_gain * quality * where
-	_pump_left = gain
-	_pump_rate = gain / maxf(pump_ramp_seconds, 0.05)
+	vel += vel.normalized() * gain * pump_instant_fraction
+	_pump_left = gain * (1.0 - pump_instant_fraction)
+	_pump_rate = _pump_left / maxf(pump_ramp_seconds, 0.05)
 	last_pump_quality = quality
 	time_since_pump = 0.0
 	pump_timer = pump_cooldown
 	if quality > 0.05:
 		pumped.emit(quality, gain)
+	_pump_glow = maxf(_pump_glow, quality)
+	if quality >= 0.5:
+		# A visible reward in the world: a gold burst off the rail, bigger the better the timing.
+		pump_burst.direction = Vector3(float(wave.direction * turn_dir) * 0.5, 0.9, 0.4)
+		pump_burst.scale_amount_min = 0.4 + 0.5 * quality
+		pump_burst.scale_amount_max = 0.8 + 0.9 * quality
+		pump_burst.initial_velocity_max = 5.0 + 6.0 * quality
+		pump_burst.restart()
 
 
 func pump_readiness() -> float:
@@ -416,13 +432,19 @@ func _land(u: float) -> void:
 	_land_from_up = global_transform.basis.y
 	_land_blend = land_blend_seconds
 	pos = Vector2(u, air_land_h)
+	# Landing VFX: a ring of spray on the water, sized by the air.
+	var big := clampf(0.5 + air_peak * 0.5, 0.5, 2.0)
+	land_ring.scale_amount_min = 0.6 * big
+	land_ring.scale_amount_max = 1.3 * big
+	land_ring.initial_velocity_max = 2.0 + 3.0 * big
 	var heading := deg_to_rad(air_land_heading_deg)
 	vel = Vector2(cos(heading), sin(heading)) * _air_speed0 * air_landing_keep
 	turn_dir = 1   # Landing sets you up climbing, which reads as a natural recovery.
 	_apply_to_transform()
-	flip_splash.initial_velocity_min = 3.0
-	flip_splash.initial_velocity_max = 6.0
-	flip_splash.restart()
+	land_ring.global_position = global_position + wave.normal(pos.x, pos.y) * 0.1
+	land_ring.restart()
+	burst.direction = Vector3(0.0, 0.9, 0.5)
+	burst.restart()
 	air_landed.emit(air_peak, air_spin, true)
 
 
@@ -490,10 +512,17 @@ func _update_juice(delta: float) -> void:
 	spray.direction = Vector3(outward * 0.9, 0.5, 0.5)
 	spray.initial_velocity_min = 1.5 + 6.0 * intensity
 	spray.initial_velocity_max = 3.0 + 9.0 * intensity
-	spray.scale_amount_min = 0.4 + 0.5 * intensity
-	spray.scale_amount_max = 0.8 + 0.9 * intensity
+	spray.scale_amount_min = (0.4 + 0.5 * intensity) * (1.0 + 0.4 * _pump_glow)
+	spray.scale_amount_max = (0.8 + 0.9 * intensity) * (1.0 + 0.6 * _pump_glow)
 	# Foamy wake dropped on the water behind the board: the cheapest way to say "this is water".
 	wake.emitting = is_live and not airborne and speed() > wake_min_speed
+	# Pump glow: spray and wake go gold after a good pump and fade back to white.
+	_pump_glow = move_toward(_pump_glow, 0.0, delta / pump_glow_seconds)
+	var glow_col := Color.WHITE.lerp(pump_glow_color, _pump_glow)
+	spray.color = glow_col
+	wake.color = glow_col
+	# Air trail: streaks off the board while airborne.
+	air_trail.emitting = airborne
 	# Sharp turn: one big splash on entry, and the rider crouches while it lasts.
 	if is_sharp and not _was_sharp:
 		burst.direction = Vector3(outward * 0.8, 0.7, 0.4)
@@ -658,6 +687,55 @@ func _setup_particles() -> void:
 	flip_splash.color_ramp = fade
 	flip_splash.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 	flip_splash.emission_sphere_radius = 0.25
+
+	pump_burst.mesh = drop
+	pump_burst.amount = 48
+	pump_burst.lifetime = 0.7
+	pump_burst.one_shot = true
+	pump_burst.explosiveness = 1.0
+	pump_burst.spread = 55.0
+	pump_burst.gravity = Vector3(0.0, -9.8, 0.0)
+	pump_burst.initial_velocity_min = 3.0
+	pump_burst.initial_velocity_max = 8.0
+	pump_burst.color = pump_glow_color
+	pump_burst.color_ramp = fade
+	pump_burst.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	pump_burst.emission_sphere_radius = 0.3
+
+	air_trail.mesh = drop
+	air_trail.amount = 70
+	air_trail.lifetime = 0.7
+	air_trail.direction = Vector3(0.0, -0.3, 1.0)
+	air_trail.spread = 25.0
+	air_trail.gravity = Vector3(0.0, -6.0, 0.0)
+	air_trail.initial_velocity_min = 1.0
+	air_trail.initial_velocity_max = 3.0
+	air_trail.scale_amount_min = 0.35
+	air_trail.scale_amount_max = 0.8
+	air_trail.color = Color(0.85, 0.95, 1.0)
+	air_trail.color_ramp = fade
+	air_trail.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	air_trail.emission_box_extents = Vector3(0.3, 0.05, 0.9)
+
+	land_ring.top_level = true
+	land_ring.mesh = drop
+	land_ring.amount = 70
+	land_ring.lifetime = 0.8
+	land_ring.one_shot = true
+	land_ring.explosiveness = 1.0
+	land_ring.direction = Vector3(0.0, 1.0, 0.0)
+	land_ring.spread = 180.0
+	land_ring.gravity = Vector3(0.0, -7.0, 0.0)
+	land_ring.radial_accel_min = 18.0
+	land_ring.radial_accel_max = 26.0
+	land_ring.initial_velocity_min = 1.0
+	land_ring.initial_velocity_max = 3.0
+	land_ring.color_ramp = fade
+	land_ring.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	land_ring.emission_ring_radius = 0.7
+	land_ring.emission_ring_inner_radius = 0.4
+	land_ring.emission_ring_height = 0.1
+	land_ring.emission_ring_axis = Vector3.UP
 
 	var foam_mesh := SphereMesh.new()
 	foam_mesh.radius = 0.16

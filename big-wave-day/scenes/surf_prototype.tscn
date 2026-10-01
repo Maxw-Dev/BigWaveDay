@@ -2,11 +2,11 @@
 
 [ext_resource type="Script" uid="uid://b65j0t7dec4ey" path="res://scripts/surf_prototype.gd" id="1_run"]
 [ext_resource type="PackedScene" path="res://scenes/wave.tscn" id="2_wave"]
-[ext_resource type="PackedScene" path="res://scenes/surfer.tscn" id="3_surfer"]
+[ext_resource type="PackedScene" uid="uid://bfml7cboj7i4w" path="res://scenes/surfer.tscn" id="3_surfer"]
 [ext_resource type="Script" uid="uid://btydfpww0lrof" path="res://scripts/chase_camera.gd" id="4_camera"]
 [ext_resource type="Script" uid="uid://b8n6sxfpgr13x" path="res://scripts/debug_hud.gd" id="5_hud"]
-[ext_resource type="Script" path="res://scripts/run_ui.gd" id="6_ui"]
-[ext_resource type="Script" path="res://scripts/wind.gd" id="7_wind"]
+[ext_resource type="Script" uid="uid://cm0hm5fn4qyq1" path="res://scripts/run_ui.gd" id="6_ui"]
+[ext_resource type="Script" uid="uid://ccxb0hdinqelr" path="res://scripts/wind.gd" id="7_wind"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_material"]
 sky_top_color = Color(0.2, 0.45, 0.85, 1)
@@ -40,6 +40,7 @@ shadow_enabled = true
 turn_rate = 140.0
 sharp_turn_rate = 375.0
 gravity = 9.5
+override_rider = false
 
 [node name="ChaseCamera" type="Camera3D" parent="." unique_id=1980096021]
 current = true
@@ -68,8 +69,8 @@ theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 18
 text = "debug"
 
-[node name="RunUi" type="CanvasLayer" parent="."]
+[node name="RunUi" type="CanvasLayer" parent="." unique_id=961192736]
 script = ExtResource("6_ui")
 
-[node name="Wind" type="AudioStreamPlayer" parent="."]
+[node name="Wind" type="AudioStreamPlayer" parent="." unique_id=488478015]
 script = ExtResource("7_wind")

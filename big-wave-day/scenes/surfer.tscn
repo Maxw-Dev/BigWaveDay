@@ -47,6 +47,17 @@ emitting = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.9)
 emitting = false
 
+[node name="PumpBurst" type="CPUParticles3D" parent="Board"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.6)
+emitting = false
+
+[node name="AirTrail" type="CPUParticles3D" parent="Board"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
+emitting = false
+
+[node name="LandRing" type="CPUParticles3D" parent="."]
+emitting = false
+
 [node name="Wake" type="CPUParticles3D" parent="." unique_id=1850976335]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0.9)
 emitting = false

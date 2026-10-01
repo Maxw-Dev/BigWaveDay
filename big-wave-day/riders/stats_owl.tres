@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1_4nk70")
 style_name = "fish"
-board_length = 1.6
+board_length = 2.15
 board_width = 0.72
-agility = 1.22
-drag = 0.029
+agility = 1.0
+drag = 0.024
 pump_gain = 4.1

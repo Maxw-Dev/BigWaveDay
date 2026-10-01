@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1_stats")
 style_name = "gun"
-board_length = 3.2
+board_length = 3.1
 board_width = 0.54
-agility = 1.05
-drag = 0.015
-pump_gain = 4.4
+agility = 1.0
+drag = 0.017
+pump_gain = 4.3
