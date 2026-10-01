@@ -3,7 +3,7 @@
 class_name SurfPrototype
 extends Node3D
 
-enum State { RIDING, ENDING, CARD, STARTING }
+enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 
 @export var endless := false          ## No timer: the wave only ends when you wipe out. Hold on the card to toggle.
 @export var wave_duration_min := 25.0
@@ -21,6 +21,13 @@ enum State { RIDING, ENDING, CARD, STARTING }
 @export var card_auto_seconds := 5.0  ## The card dismisses itself after this.
 @export var card_hold_toggle := 0.8   ## Holding this long on the card toggles endless mode.
 @export var fade_seconds := 0.35
+
+@export_group("Replay")
+@export var replay_enabled := true
+@export var replay_window := 3.5          ## Seconds of the ride shown, chosen as the highest-scoring stretch.
+@export var replay_speed := 0.8           ## Playback rate. Under 1 is a little slow-motion.
+@export var replay_min_ride := 4.0        ## Rides shorter than this skip the replay.
+@export var replay_cam_offset := Vector3(2.0, 7.0, 15.0)   ## From the window's midpoint: ahead down the line, up, out over the flats.
 @export var show_first_wave_hints := false  ## Text hints on the first wave. Off: the game shows, it does not tell.
 
 var state := State.RIDING
@@ -41,6 +48,15 @@ var air_count := 0
 var _barrel_streak := 0.0
 var _card_hold := 0.0
 var _card_toggled := false
+var _frames: Array[Dictionary] = []
+var _replay_cursor := 0.0
+var _replay_start := 0
+var _replay_end := 0
+var _replay_cam: Camera3D
+var _replay_anchor := Vector3.ZERO
+var _title_hold := 0.0
+var _title_toggled := false
+var sfx: Sfx
 
 var _state_t := 0.0
 var _live_t := 0.0
@@ -58,7 +74,17 @@ func _ready() -> void:
 	surfer.pumped.connect(_on_pumped)
 	surfer.air_started.connect(_on_air_started)
 	surfer.air_landed.connect(_on_air_landed)
+	_replay_cam = Camera3D.new()
+	_replay_cam.name = "ReplayCam"
+	_replay_cam.fov = 55.0
+	add_child(_replay_cam)
+	sfx = Sfx.new()
+	sfx.name = "Sfx"
+	add_child(sfx)
+	surfer.flipped.connect(func(s: float): sfx.splash(s / 12.0))
+	surfer.snapped.connect(sfx.splash_big)
 	start_wave()
+	_enter_title()
 
 
 func start_wave() -> void:
@@ -75,6 +101,7 @@ func start_wave() -> void:
 	sharp_turns = 0
 	biggest_air = 0.0
 	air_count = 0
+	_frames.clear()
 	_was_sharp = false
 	_live_t = 0.0
 	_hint_step = 0
@@ -98,6 +125,7 @@ func _physics_process(delta: float) -> void:
 	if not endless:
 		time_left -= delta
 	_track_highlights(delta)
+	_record_frame()
 	var reason := ""
 	if time_left <= 0.0:
 		reason = "closed out"
@@ -114,12 +142,22 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_state_t += delta / maxf(Engine.time_scale, 0.001)
 	_update_feel_overlays()
+	if Input.is_action_just_pressed("ui_cancel") and state != State.TITLE:
+		_to_title()
+		return
 	match state:
+		State.TITLE:
+			_update_title_input(delta)
 		State.RIDING:
 			_update_prompts(delta)
 		State.ENDING:
 			if _state_t >= ending_seconds:
-				_show_card()
+				if replay_enabled and ride_time >= replay_min_ride and _frames.size() > 60:
+					_start_replay()
+				else:
+					_show_card()
+		State.REPLAY:
+			_update_replay(delta)
 		State.CARD:
 			_update_card_input(delta)
 
@@ -135,6 +173,127 @@ func wave_over(reason: String) -> void:
 	surfer.input_enabled = false
 	ui.hide_prompt()
 	Engine.time_scale = ending_slowmo
+
+
+func _enter_title() -> void:
+	# The wave sits still behind the title; the surfer is already placed on it.
+	state = State.TITLE
+	_state_t = 0.0
+	_title_hold = 0.0
+	_title_toggled = false
+	surfer.input_enabled = false
+	surfer.set_physics_process(false)
+	wave.set_physics_process(false)
+	ui.hide_prompt()
+	ui.show_title(_title_mode_text())
+
+
+func _leave_title() -> void:
+	ui.hide_title()
+	surfer.set_physics_process(true)
+	wave.set_physics_process(true)
+	surfer.input_enabled = true
+	state = State.RIDING
+	_state_t = 0.0
+	ui.show_prompt("TAP to drop in")
+
+
+func _to_title() -> void:
+	Engine.time_scale = 1.0
+	camera.current = true
+	surfer.trail.visible = true
+	ui.set_letterbox(false)
+	ui.hide_card()
+	surfer.set_physics_process(true)
+	wave.set_physics_process(true)
+	start_wave()
+	_enter_title()
+
+
+func _title_mode_text() -> String:
+	return "HOLD for endless mode: %s" % ("ON" if endless else "OFF")
+
+
+func _update_title_input(delta: float) -> void:
+	if Input.is_action_pressed(Surfer.ACTION):
+		_title_hold += delta
+		if _title_hold >= card_hold_toggle and not _title_toggled:
+			_title_toggled = true
+			endless = not endless
+			ui.set_title_mode(_title_mode_text())
+		return
+	if Input.is_action_just_released(Surfer.ACTION):
+		var was_tap := _title_hold < card_hold_toggle and not _title_toggled
+		_title_hold = 0.0
+		_title_toggled = false
+		if was_tap and _state_t > 0.3:
+			_leave_title()
+
+
+func _record_frame() -> void:
+	var f := surfer.capture_frame()
+	f["foam"] = wave.foam_u
+	var d := wave.ahead_of_break(surfer.pos.x)
+	f["score"] = surfer.speed() * 0.1 + (1.5 if d < camera.barrel_enter else 0.0) + (0.8 if surfer.is_sharp else 0.0) + (3.0 if surfer.airborne else 0.0) + float(f.glow)
+	_frames.append(f)
+
+
+func _start_replay() -> void:
+	# Find the highest-scoring stretch of the ride and play it back through a fixed camera on the flats.
+	Engine.time_scale = 1.0
+	surfer.set_physics_process(false)
+	wave.set_physics_process(false)
+	var n := _frames.size()
+	var win := mini(int(replay_window * 60.0), n)
+	var best := 0
+	var best_sum := -1.0
+	var sum := 0.0
+	for i in range(n):
+		sum += float(_frames[i].score)
+		if i >= win:
+			sum -= float(_frames[i - win].score)
+		if i >= win - 1 and sum > best_sum:
+			best_sum = sum
+			best = i - win + 1
+	_replay_start = best
+	_replay_end = best + win
+	_replay_cursor = float(best)
+	var mid: Transform3D = _frames[best + win / 2].xf
+	var off := replay_cam_offset
+	off.x *= wave.direction
+	_replay_anchor = mid.origin + off
+	_replay_cam.global_position = _replay_anchor
+	_replay_cam.current = true
+	surfer.trail.visible = false
+	ui.set_letterbox(true)
+	state = State.REPLAY
+	_state_t = 0.0
+	_apply_replay_frame(best)
+
+
+func _apply_replay_frame(i: int) -> void:
+	var f: Dictionary = _frames[clampi(i, 0, _frames.size() - 1)]
+	surfer.apply_frame(f)
+	wave.set_break(float(f.foam))
+	_replay_cam.look_at(surfer.global_position + Vector3(0.0, 1.2, 0.0), Vector3.UP)
+
+
+func _update_replay(delta: float) -> void:
+	_replay_cursor += delta * 60.0 * replay_speed
+	var skip := Input.is_action_just_released(Surfer.ACTION) and _state_t > 0.4
+	if _replay_cursor >= _replay_end or skip:
+		_end_replay()
+		return
+	_apply_replay_frame(int(_replay_cursor))
+
+
+func _end_replay() -> void:
+	# Back to the wipeout moment for the card.
+	_apply_replay_frame(_frames.size() - 1)
+	camera.current = true
+	surfer.trail.visible = true
+	ui.set_letterbox(false)
+	_show_card()
 
 
 func _show_card() -> void:
@@ -197,20 +356,27 @@ func _update_feel_overlays() -> void:
 	ui.set_speed_lines(clampf((spd - 7.0) / 5.0, 0.0, 1.0) * 0.75 if riding else 0.0)
 	if wind != null:
 		wind.set_speed(spd if riding else 0.0)
+	if sfx != null:
+		var d := wave.ahead_of_break(surfer.pos.x)
+		sfx.set_break_closeness(clampf(1.0 - d / 25.0, 0.0, 1.0) if riding else 0.3)
 
 
 
-func _on_pumped(_quality: float, _gain: float) -> void:
-	pass   # Feedback lives in the world now (gold spray), not on the screen.
+func _on_pumped(quality: float, _gain: float) -> void:
+	if quality >= 0.5 and sfx != null:
+		sfx.pump(quality)
 
 
 func _on_air_started(_vertical: float) -> void:
-	pass
+	if sfx != null:
+		sfx.whoosh()
 
 
 func _on_air_landed(height: float, _spin_deg: float, _clean: bool) -> void:
 	air_count += 1
 	biggest_air = maxf(biggest_air, height)
+	if sfx != null:
+		sfx.splash_big()
 
 
 func _restart() -> void:

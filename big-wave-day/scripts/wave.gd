@@ -50,6 +50,12 @@ func reset() -> void:
 	_place()
 
 
+func set_break(u: float) -> void:
+	# Used by the replay to scrub the break back to where it was.
+	foam_u = u
+	_place()
+
+
 func set_direction(dir: int) -> void:
 	# Switch between the prebuilt left and right faces. Cheap enough to do every wave.
 	direction = dir

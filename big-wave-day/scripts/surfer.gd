@@ -11,6 +11,8 @@ extends Node3D
 const ACTION := "surf"
 
 signal pumped(quality: float, gain: float)
+signal flipped(speed: float)
+signal snapped()
 signal air_started(vertical_speed: float)
 signal air_landed(height: float, spin_deg: float, clean: bool)
 
@@ -271,6 +273,7 @@ func _physics_process(delta: float) -> void:
 			if not airborne:
 				_try_pump()
 				_flip_splash()
+				flipped.emit(speed())
 		else:
 			is_live = true   # First press on a fresh wave drops in without flipping: the first arc is a climb.
 	if input_enabled and _hold_armed and Input.is_action_pressed(ACTION):
@@ -448,6 +451,40 @@ func _land(u: float) -> void:
 	air_landed.emit(air_peak, air_spin, true)
 
 
+func capture_frame() -> Dictionary:
+	# Everything the replay needs to re-pose the surfer and its particles for one tick.
+	return {
+		"xf": global_transform,
+		"board": board.rotation,
+		"rider_y": rider.position.y if rider != null else 0.0,
+		"rider_sy": rider.scale.y if rider != null else 1.0,
+		"spray": spray.emitting,
+		"spray_dir": spray.direction,
+		"spray_v": spray.initial_velocity_max,
+		"wake": wake.emitting,
+		"air": airborne,
+		"glow": _pump_glow,
+		"speed": speed(),
+		"sharp": is_sharp,
+	}
+
+
+func apply_frame(f: Dictionary) -> void:
+	global_transform = f.xf
+	board.rotation = f.board
+	if rider != null:
+		rider.position.y = f.rider_y
+		rider.scale = Vector3(1.0, f.rider_sy, 1.0)
+	spray.emitting = f.spray
+	spray.direction = f.spray_dir
+	spray.initial_velocity_max = f.spray_v
+	wake.emitting = f.wake
+	air_trail.emitting = f.air
+	var glow_col := Color.WHITE.lerp(pump_glow_color, f.glow)
+	spray.color = glow_col
+	wake.color = glow_col
+
+
 func speed() -> float:
 	return _air_vel.length() if airborne else vel.length()
 
@@ -527,6 +564,7 @@ func _update_juice(delta: float) -> void:
 	if is_sharp and not _was_sharp:
 		burst.direction = Vector3(outward * 0.8, 0.7, 0.4)
 		burst.restart()
+		snapped.emit()
 	_was_sharp = is_sharp
 	var crouch := crouch_scale if is_sharp else 1.0
 	var k := 1.0 - exp(-14.0 * delta)

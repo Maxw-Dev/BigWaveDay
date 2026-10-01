@@ -14,7 +14,11 @@ var _prompt: Label
 var _hint: Label
 var _hint_tween: Tween
 var _speed_lines: ColorRect
+var _bar_top: ColorRect
+var _bar_bottom: ColorRect
 var _mode: Label
+var _title_box: Control
+var _title_mode: Label
 
 const SPEED_SHADER := preload("res://shaders/speed_lines.gdshader")
 
@@ -28,6 +32,18 @@ func _ready() -> void:
 	sm.shader = SPEED_SHADER
 	_speed_lines.material = sm
 	add_child(_speed_lines)
+	_bar_top = ColorRect.new()
+	_bar_top.color = Color.BLACK
+	_bar_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_bar_top.anchor_bottom = 0.0
+	_bar_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bar_top)
+	_bar_bottom = ColorRect.new()
+	_bar_bottom.color = Color.BLACK
+	_bar_bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_bar_bottom.anchor_top = 1.0
+	_bar_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bar_bottom)
 	_fade = _full_rect(ColorRect.new())
 	_fade.color = Color(0.02, 0.05, 0.1, 1.0)
 	_fade.modulate.a = 0.0
@@ -89,6 +105,28 @@ func _ready() -> void:
 		box.add_child(l)
 	_continue.modulate.a = 0.0
 
+	# Title screen.
+	_title_box = _full_rect(Control.new())
+	_title_box.visible = false
+	_title_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_title_box)
+	var tc := CenterContainer.new()
+	_full_rect(tc)
+	tc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_title_box.add_child(tc)
+	var tb := VBoxContainer.new()
+	tb.alignment = BoxContainer.ALIGNMENT_CENTER
+	tb.add_theme_constant_override("separation", 18)
+	tc.add_child(tb)
+	var name := _label(84, Color(1, 1, 1))
+	name.text = "BIG WAVE DAY"
+	var go := _label(32, Color(0.9, 0.95, 1.0))
+	go.text = "TAP to surf"
+	_title_mode = _label(22, Color(0.75, 0.85, 0.95))
+	for l in [name, go, _title_mode]:
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tb.add_child(l)
+
 
 func show_prompt(text: String) -> void:
 	_prompt.text = text
@@ -126,6 +164,31 @@ func show_card(title: String, colour: Color, subtitle: String, lines: PackedStri
 
 func hide_card() -> void:
 	_card.visible = false
+
+
+func show_title(mode_text: String) -> void:
+	_title_mode.text = mode_text
+	_title_box.visible = true
+	_title_box.modulate.a = 0.0
+	create_tween().tween_property(_title_box, "modulate:a", 1.0, 0.4)
+
+
+func set_title_mode(mode_text: String) -> void:
+	_title_mode.text = mode_text
+
+
+func hide_title() -> void:
+	var tw := create_tween()
+	tw.tween_property(_title_box, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(func(): _title_box.visible = false)
+
+
+func set_letterbox(on: bool) -> void:
+	# Cinema bars say "replay" without a word on screen.
+	var tw := create_tween().set_parallel(true)
+	var h := 0.11 if on else 0.0
+	tw.tween_property(_bar_top, "anchor_bottom", h, 0.35)
+	tw.tween_property(_bar_bottom, "anchor_top", 1.0 - h, 0.35)
 
 
 func set_mode_text(text: String) -> void:
