@@ -9,7 +9,7 @@ script = ExtResource("1_ck7mo")
 y_offset = 0.48
 scale_mod = 0.86
 rider_width = 1.0
-model = NodePath("Bear2")
+model = NodePath("Bear")
 stats = ExtResource("2_ck7mo")
 
-[node name="Bear2" parent="." unique_id=1821803275 instance=ExtResource("3_ck7mo")]
+[node name="Bear" parent="." unique_id=1821803275 instance=ExtResource("3_ck7mo")]
