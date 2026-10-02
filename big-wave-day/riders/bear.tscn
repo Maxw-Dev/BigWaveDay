@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://bs7melysc6iih"]
+
+[ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_ck7mo"]
+[ext_resource type="Resource" uid="uid://bmmx3ddndl13m" path="res://riders/stats_bear.tres" id="2_ck7mo"]
+[ext_resource type="PackedScene" uid="uid://bq4nl6ye76h54" path="res://models/Bear.blend" id="3_ck7mo"]
+
+[node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
+script = ExtResource("1_ck7mo")
+y_offset = 0.48
+scale_mod = 0.86
+rider_width = 1.0
+model = NodePath("Bear2")
+stats = ExtResource("2_ck7mo")
+
+[node name="Bear2" parent="." unique_id=1821803275 instance=ExtResource("3_ck7mo")]
