@@ -816,13 +816,18 @@ func _ensure_input_action() -> void:
 	if InputMap.has_action(ACTION):
 		return
 	InputMap.add_action(ACTION)
-	# Still one button, on three devices: Space, left mouse (touch emulates the mouse on phones), gamepad A.
+	# Still one button, on three inputs: Space, left mouse (phone taps arrive as emulated clicks), gamepad A.
+	# Every binding is for ALL devices (-1). Events created in code default to device 0, and an emulated
+	# click from a phone tap carries device -1 (DEVICE_ID_EMULATION), which a device-0 binding silently ignores.
 	var key := InputEventKey.new()
 	key.physical_keycode = KEY_SPACE
+	key.device = -1
 	InputMap.action_add_event(ACTION, key)
 	var mouse := InputEventMouseButton.new()
 	mouse.button_index = MOUSE_BUTTON_LEFT
+	mouse.device = -1
 	InputMap.action_add_event(ACTION, mouse)
 	var pad := InputEventJoypadButton.new()
 	pad.button_index = JOY_BUTTON_A
+	pad.device = -1
 	InputMap.action_add_event(ACTION, pad)
