@@ -68,7 +68,7 @@ func splash_big() -> void:
 
 
 func pump(quality: float) -> void:
-	_play(pump_sample, -12.0 + 6.0 * clampf(quality, 0.0, 1.0), 0.9 + 0.25 * clampf(quality, 0.0, 1.0))
+	_play(pump_sample, -14.0 + 6.0 * clampf(quality, 0.0, 1.0), 0.95 + 0.12 * clampf(quality, 0.0, 1.0))
 
 
 func whoosh() -> void:
@@ -126,12 +126,20 @@ func _noise_burst(seconds: float, lp: float, tau: float, hp: float) -> AudioStre
 
 
 func _ding() -> AudioStreamWAV:
-	var n := int(0.32 * RATE)
+	# A low, soft surge: a warm tone with a fifth on top and a swell of water noise under it. Says "yes",
+	# not "alarm".
+	var n := int(0.45 * RATE)
 	var out := PackedFloat32Array()
 	out.resize(n)
+	var low := 0.0
 	for i in range(n):
 		var t := float(i) / RATE
-		out[i] = sin(TAU * 880.0 * t) * exp(-t / 0.16) + 0.45 * sin(TAU * 1318.5 * t) * exp(-t / 0.09)
+		var attack := minf(t / 0.04, 1.0)
+		var tone := sin(TAU * 196.0 * t) * exp(-t / 0.28) + 0.5 * sin(TAU * 293.7 * t) * exp(-t / 0.2)
+		var white := randf() * 2.0 - 1.0
+		low += (white - low) * 0.07
+		var swell := low * 0.9 * sin(PI * minf(t / 0.45, 1.0))
+		out[i] = (tone * 0.7 + swell) * attack
 	return _to_wav(out, false)
 
 
