@@ -16,7 +16,7 @@ enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 
 @export_group("Reset flow")
 @export var ending_slowmo := 0.3      ## Time scale while the wipeout plays out.
-@export var ending_seconds := 0.7     ## Real seconds of slow motion before the card.
+@export var ending_seconds := 1.6     ## Real seconds of slow motion before the replay or card.
 @export var card_min_seconds := 1.2   ## The card cannot be dismissed before this.
 @export var card_auto_seconds := 5.0  ## The card dismisses itself after this.
 @export var card_hold_toggle := 0.8   ## Holding this long on the card toggles endless mode.
@@ -24,10 +24,18 @@ enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 
 @export_group("Replay")
 @export var replay_enabled := true
-@export var replay_window := 3.5          ## Seconds of the ride shown, chosen as the highest-scoring stretch.
-@export var replay_speed := 0.8           ## Playback rate. Under 1 is a little slow-motion.
-@export var replay_min_ride := 4.0        ## Rides shorter than this skip the replay.
-@export var replay_cam_offset := Vector3(2.0, 7.0, 15.0)   ## From the window's midpoint: ahead down the line, up, out over the flats.
+@export var replay_window := 5.0          ## Seconds of the ride shown, chosen as the highest-scoring stretch.
+@export var replay_speed := 0.85          ## Playback rate. Under 1 is a little slow-motion.
+@export var replay_min_ride := 5.0        ## Rides shorter than this skip the replay.
+@export var replay_barrel_bias := 0.4                      ## Aim point sits this far from the rider toward the barrel's lip (0 = rider only, 1 = barrel only).
+@export var replay_out_min := 9.0                          ## Camera distance out over the flats when the rider is in the tube...
+@export var replay_out_max := 26.0                         ## ...and the most it backs off when the rider is far down the line.
+@export var replay_out_per_metre := 0.5                    ## Extra metres of distance per metre between rider and barrel.
+@export var replay_ahead_ratio := 0.35                     ## How far ahead of the rider (down the line) the camera sits, as a fraction of its distance out.
+@export var replay_up_ratio := 0.32                        ## Camera height as a fraction of its distance out.
+@export var replay_look_up := 1.2
+@export var replay_cam_fov := 50.0
+@export var replay_cam_smoothing := 5.0
 @export var show_first_wave_hints := false  ## Text hints on the first wave. Off: the game shows, it does not tell.
 
 var state := State.RIDING
@@ -76,7 +84,7 @@ func _ready() -> void:
 	surfer.air_landed.connect(_on_air_landed)
 	_replay_cam = Camera3D.new()
 	_replay_cam.name = "ReplayCam"
-	_replay_cam.fov = 55.0
+	_replay_cam.fov = replay_cam_fov
 	add_child(_replay_cam)
 	sfx = Sfx.new()
 	sfx.name = "Sfx"
@@ -258,24 +266,38 @@ func _start_replay() -> void:
 	_replay_start = best
 	_replay_end = best + win
 	_replay_cursor = float(best)
-	var mid: Transform3D = _frames[best + win / 2].xf
-	var off := replay_cam_offset
-	off.x *= wave.direction
-	_replay_anchor = mid.origin + off
-	_replay_cam.global_position = _replay_anchor
+	_replay_cam.fov = replay_cam_fov
 	_replay_cam.current = true
 	surfer.trail.visible = false
 	ui.set_letterbox(true)
 	state = State.REPLAY
 	_state_t = 0.0
 	_apply_replay_frame(best)
+	_replay_cam.global_position = _replay_cam_target()
+	_replay_cam.look_at(_replay_aim(), Vector3.UP)
+
+
+func _replay_barrel_point() -> Vector3:
+	# The lip of the tube, just ahead of the break line of the frame being shown.
+	return wave.world_point(wave.foam_u + 2.5, 0.92)
+
+
+func _replay_cam_target() -> Vector3:
+	# Stand out on the flats, a little ahead of the rider, far enough back that the barrel fits in the frame too.
+	var sep := surfer.global_position.distance_to(_replay_barrel_point())
+	var out := clampf(replay_out_min + sep * replay_out_per_metre, replay_out_min, replay_out_max)
+	return surfer.global_position + Vector3(replay_ahead_ratio * out * wave.direction, replay_up_ratio * out, out)
+
+
+func _replay_aim() -> Vector3:
+	var rider := surfer.global_position + Vector3(0.0, replay_look_up, 0.0)
+	return rider.lerp(_replay_barrel_point(), replay_barrel_bias)
 
 
 func _apply_replay_frame(i: int) -> void:
 	var f: Dictionary = _frames[clampi(i, 0, _frames.size() - 1)]
 	surfer.apply_frame(f)
 	wave.set_break(float(f.foam))
-	_replay_cam.look_at(surfer.global_position + Vector3(0.0, 1.2, 0.0), Vector3.UP)
 
 
 func _update_replay(delta: float) -> void:
@@ -285,6 +307,9 @@ func _update_replay(delta: float) -> void:
 		_end_replay()
 		return
 	_apply_replay_frame(int(_replay_cursor))
+	# Tracking shot: slide along ahead of and outside the rider, always looking back at them.
+	_replay_cam.global_position = _replay_cam.global_position.lerp(_replay_cam_target(), 1.0 - exp(-replay_cam_smoothing * delta))
+	_replay_cam.look_at(_replay_aim(), Vector3.UP)
 
 
 func _end_replay() -> void:

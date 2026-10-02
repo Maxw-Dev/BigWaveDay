@@ -48,8 +48,10 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 @export var spray_full_intensity := 60.0    ## speed (m/s) x turn rate (rad/s) that makes a full-size spray fan. A sharp turn at 10 m/s is ~73.
 @export var spray_min_intensity := 8.0      ## Below this no spray, just the wake.
 @export var crouch_scale := 0.65             ## Rider height while holding a sharp turn.
-@export var pump_glow_color := Color(1.0, 0.82, 0.25)  ## Spray and wake tint after a good pump, fading back to white.
+@export var pump_glow_color := Color(1.0, 0.9, 0.6)    ## Spray tint after a good pump, eased in and fading back to white. The burst itself stays gold.
+@export var pump_burst_color := Color(1.0, 0.82, 0.3)
 @export var pump_glow_seconds := 1.2
+@export var pump_glow_rise := 0.3        ## Seconds for the tint to ease in, so it never snaps.
 @export var wake_min_speed := 2.0
 
 @export_group("Airs")
@@ -98,7 +100,8 @@ var is_live := false                      ## False until the first press on a fr
 var wave: Wave
 
 var _hold_armed := false                  ## A hold only counts after a fresh press (not one carried across a respawn).
-var _pump_glow := 0.0                     ## 0..1, how recently and how well you pumped. Drives the gold spray.
+var _pump_glow := 0.0                     ## 0..1, how recently and how well you pumped. Drives the spray tint.
+var _pump_glow_target := 0.0
 var _pump_left := 0.0                     ## m/s of pump boost still to feed in.
 var _pump_rate := 0.0                     ## m/s per second it feeds in at.
 var _forward := Vector3.RIGHT
@@ -359,7 +362,7 @@ func _try_pump() -> void:
 	pump_timer = pump_cooldown
 	if quality > 0.05:
 		pumped.emit(quality, gain)
-	_pump_glow = maxf(_pump_glow, quality)
+	_pump_glow_target = maxf(_pump_glow_target, quality)
 	if quality >= 0.5:
 		# A visible reward in the world: a gold burst off the rail, bigger the better the timing.
 		pump_burst.direction = Vector3(float(wave.direction * turn_dir) * 0.5, 0.9, 0.4)
@@ -480,9 +483,8 @@ func apply_frame(f: Dictionary) -> void:
 	spray.initial_velocity_max = f.spray_v
 	wake.emitting = f.wake
 	air_trail.emitting = f.air
-	var glow_col := Color.WHITE.lerp(pump_glow_color, f.glow)
-	spray.color = glow_col
-	wake.color = glow_col
+	spray.color = Color.WHITE.lerp(pump_glow_color, f.glow)
+	wake.color = Color.WHITE
 
 
 func speed() -> float:
@@ -553,11 +555,14 @@ func _update_juice(delta: float) -> void:
 	spray.scale_amount_max = (0.8 + 0.9 * intensity) * (1.0 + 0.6 * _pump_glow)
 	# Foamy wake dropped on the water behind the board: the cheapest way to say "this is water".
 	wake.emitting = is_live and not airborne and speed() > wake_min_speed
-	# Pump glow: spray and wake go gold after a good pump and fade back to white.
-	_pump_glow = move_toward(_pump_glow, 0.0, delta / pump_glow_seconds)
-	var glow_col := Color.WHITE.lerp(pump_glow_color, _pump_glow)
-	spray.color = glow_col
-	wake.color = glow_col
+	# Pump glow: the spray warms up after a good pump, easing in and fading back out. The wake stays white.
+	_pump_glow_target = move_toward(_pump_glow_target, 0.0, delta / pump_glow_seconds)
+	if _pump_glow < _pump_glow_target:
+		_pump_glow = move_toward(_pump_glow, _pump_glow_target, delta / pump_glow_rise)
+	else:
+		_pump_glow = _pump_glow_target
+	spray.color = Color.WHITE.lerp(pump_glow_color, _pump_glow)
+	wake.color = Color.WHITE
 	# Air trail: streaks off the board while airborne.
 	air_trail.emitting = airborne
 	# Sharp turn: one big splash on entry, and the rider crouches while it lasts.
@@ -735,7 +740,7 @@ func _setup_particles() -> void:
 	pump_burst.gravity = Vector3(0.0, -9.8, 0.0)
 	pump_burst.initial_velocity_min = 3.0
 	pump_burst.initial_velocity_max = 8.0
-	pump_burst.color = pump_glow_color
+	pump_burst.color = pump_burst_color
 	pump_burst.color_ramp = fade
 	pump_burst.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 	pump_burst.emission_sphere_radius = 0.3

@@ -22,6 +22,8 @@ func _ready() -> void:
 	gen.buffer_length = 0.12
 	stream = gen
 	volume_db = -60.0
+	# Generated audio must be streamed; the web export defaults to sample playback, which cannot play it.
+	playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	play()
 	_pb = get_stream_playback()
 
