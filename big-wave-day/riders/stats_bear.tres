@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RiderStats" format=3 uid="uid://bmmx3ddndl13m"]
+
+[ext_resource type="Script" uid="uid://cb5xch4yldqwi" path="res://riders/rider_stats.gd" id="1_lsp3n"]
+
+[resource]
+script = ExtResource("1_lsp3n")
+style_name = "gun"
+board_length = 3.4
+board_width = 0.8
+agility = 1.3
+drag = 0.024
+pump_gain = 4.8

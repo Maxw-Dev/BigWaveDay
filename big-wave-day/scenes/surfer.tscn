@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://ek0c8cq8aq74" path="res://riders/iguana.tscn" id="3_j4dam"]
 [ext_resource type="PackedScene" uid="uid://coi7pa11mfmgt" path="res://riders/basilisk.tscn" id="4_j4dam"]
 [ext_resource type="PackedScene" uid="uid://bidku8mn1dwvt" path="res://riders/owl.tscn" id="5_myaku"]
+[ext_resource type="PackedScene" uid="uid://bs7melysc6iih" path="res://riders/bear.tscn" id="6_vpvot"]
 
 [sub_resource type="StandardMaterial3D" id="mat_board"]
 albedo_color = Color(1, 0.45, 0.05, 1)
@@ -21,9 +22,9 @@ height = 1.5
 
 [node name="Surfer" type="Node3D" unique_id=712333290]
 script = ExtResource("1_surfer")
-rider_scenes = Array[PackedScene]([ExtResource("2_j4dam"), ExtResource("3_j4dam"), ExtResource("4_j4dam"), ExtResource("5_myaku")])
+rider_scenes = Array[PackedScene]([ExtResource("2_j4dam"), ExtResource("3_j4dam"), ExtResource("4_j4dam"), ExtResource("5_myaku"), ExtResource("6_vpvot")])
 override_rider = true
-override_rider_num = 3
+override_rider_num = 4
 
 [node name="Board" type="MeshInstance3D" parent="." unique_id=1137501579]
 material_override = SubResource("mat_board")
@@ -47,15 +48,15 @@ emitting = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.9)
 emitting = false
 
-[node name="PumpBurst" type="CPUParticles3D" parent="Board"]
+[node name="PumpBurst" type="CPUParticles3D" parent="Board" unique_id=1477177789]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.6)
 emitting = false
 
-[node name="AirTrail" type="CPUParticles3D" parent="Board"]
+[node name="AirTrail" type="CPUParticles3D" parent="Board" unique_id=379961213]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.8)
 emitting = false
 
-[node name="LandRing" type="CPUParticles3D" parent="."]
+[node name="LandRing" type="CPUParticles3D" parent="." unique_id=1522965394]
 emitting = false
 
 [node name="Wake" type="CPUParticles3D" parent="." unique_id=1850976335]
