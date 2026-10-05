@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://coi7pa11mfmgt" path="res://riders/basilisk.tscn" id="4_j4dam"]
 [ext_resource type="PackedScene" uid="uid://bidku8mn1dwvt" path="res://riders/owl.tscn" id="5_myaku"]
 [ext_resource type="PackedScene" uid="uid://bs7melysc6iih" path="res://riders/bear.tscn" id="6_vpvot"]
+[ext_resource type="PackedScene" uid="uid://c6wiiso3twlh1" path="res://riders/fox.tscn" id="7_lypf0"]
 
 [sub_resource type="StandardMaterial3D" id="mat_board"]
 albedo_color = Color(1, 0.45, 0.05, 1)
@@ -22,7 +23,7 @@ height = 1.5
 
 [node name="Surfer" type="Node3D" unique_id=712333290]
 script = ExtResource("1_surfer")
-rider_scenes = Array[PackedScene]([ExtResource("2_j4dam"), ExtResource("3_j4dam"), ExtResource("4_j4dam"), ExtResource("5_myaku"), ExtResource("6_vpvot")])
+rider_scenes = Array[PackedScene]([ExtResource("2_j4dam"), ExtResource("3_j4dam"), ExtResource("4_j4dam"), ExtResource("5_myaku"), ExtResource("6_vpvot"), ExtResource("7_lypf0")])
 
 [node name="Board" type="MeshInstance3D" parent="." unique_id=1137501579]
 material_override = SubResource("mat_board")

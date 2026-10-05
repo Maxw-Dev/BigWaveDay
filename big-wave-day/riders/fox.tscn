@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://c6wiiso3twlh1"]
+
+[ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_em2ql"]
+[ext_resource type="Resource" uid="uid://bbu114jf2h6l2" path="res://riders/stats_owl.tres" id="2_td8ik"]
+[ext_resource type="PackedScene" uid="uid://i8jpdcn7nssg" path="res://models/Fox.blend" id="3_em2ql"]
+
+[node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
+script = ExtResource("1_em2ql")
+y_offset = 0.59
+scale_mod = 1.5
+rider_width = 0.8
+model = NodePath("Fox")
+stats = ExtResource("2_td8ik")
+
+[node name="Fox" parent="." unique_id=942499772 instance=ExtResource("3_em2ql")]
