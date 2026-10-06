@@ -588,7 +588,6 @@ func _setup_board() -> void:
 		if names[n].is_equal_approx(deck):
 			deck_name = n
 			board_color = n
-			print(board_color)
 	board_look = {"deck": deck, "stripe": stripe, "has_stripe": randf() < 0.6, "tip": stripe if randf() < 0.5 else deck.darkened(0.3),
 		"length": board_length, "name": deck_name}
 	board.mesh = _build_board_mesh(board_look.length, board_width, board_thickness)

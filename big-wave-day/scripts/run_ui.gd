@@ -115,8 +115,9 @@ func _ready() -> void:
 	_card.add_child(_board_background)
 	_board_background.rotation_order=EULER_ORDER_ZYX
 	_board_background.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_board_background.sorting_offset = 20.0
 	
-
+	
 	# Title screen.
 	_title_box = _full_rect(Control.new())
 	_title_box.visible = false
