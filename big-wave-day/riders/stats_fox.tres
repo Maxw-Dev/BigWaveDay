@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RiderStats" format=3 uid="uid://b5rkf8jxi6kxh"]
+
+[ext_resource type="Script" uid="uid://cb5xch4yldqwi" path="res://riders/rider_stats.gd" id="1_316th"]
+
+[resource]
+script = ExtResource("1_316th")
+style_name = "fish"
+board_length = 2.4
+board_width = 0.66
+agility = 1.1
+pump_gain = 4.5
