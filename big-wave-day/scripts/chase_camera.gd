@@ -30,9 +30,20 @@ extends Camera3D
 @export var barrel_fov := 72.0
 @export var barrel_transition := 1.4            ## Seconds to dolly between the two distances.
 
+@export_group("Wave ending")
+@export var outro_back := 14.0                         ## End shot: this far behind the rider up the line...
+@export var outro_height := 6.0                        ## ...this high...
+@export var outro_out := 5.0                           ## ...and this far out over the flats, so it sees the lit front of the wave...
+@export var outro_island_bias := 0.18                  ## ...aimed this far from the rider toward the island, so both are in frame.
+@export var outro_clearance := 1.5                     ## Never lower than the wave's top plus this.
+@export var outro_fov := 62.0
+@export var barrel_min_size := 0.6                     ## Below this wave size there is no tube to be inside, so no barrel camera.
+
 var target: Node3D
 var wave: Wave
 var in_barrel := false
+var outro := 0.0                                       ## 0..1, set by the run as the wave dies.
+var outro_focus := Vector3.INF                         ## The home island, set by the run. INF = look down the line instead.
 var _blend := 0.0                               ## 0 follow, 1 barrel; eased in time.
 
 
@@ -50,10 +61,28 @@ func _physics_process(delta: float) -> void:
 	_update_mode()
 	_blend = move_toward(_blend, 1.0 if in_barrel else 0.0, delta / barrel_transition)
 	var w := smoothstep(0.0, 1.0, _blend)
-	global_position = global_position.lerp(_rig_position(w), 1.0 - exp(-smoothing * delta))
-	look_at(_aim(), Vector3.UP)
+	var o := smoothstep(0.0, 1.0, outro)
+	var desired := _rig_position(w).lerp(_outro_position(), o)
+	global_position = global_position.lerp(desired, 1.0 - exp(-smoothing * delta))
+	look_at(_aim().lerp(_outro_aim(), o), Vector3.UP)
 	var speed_fov := (target as Surfer).speed() * fov_per_speed if target is Surfer else 0.0
-	fov = lerpf(fov, lerpf(follow_fov + speed_fov, barrel_fov, w), 1.0 - exp(-4.0 * delta))
+	var want_fov := lerpf(lerpf(follow_fov + speed_fov, barrel_fov, w), outro_fov, o)
+	fov = lerpf(fov, want_fov, 1.0 - exp(-4.0 * delta))
+
+
+func _outro_position() -> Vector3:
+	var rider := target.global_position
+	var p := rider + Vector3(-outro_back * _dir(), outro_height, outro_out)
+	if wave != null:
+		p.y = maxf(p.y, wave.top_height(p.x * _dir()) + outro_clearance)
+	return p
+
+
+func _outro_aim() -> Vector3:
+	var rider := target.global_position + Vector3(0.0, 1.0, 0.0)
+	if outro_focus == Vector3.INF:
+		return rider + Vector3(14.0 * _dir(), 0.0, 0.0)
+	return rider.lerp(outro_focus, outro_island_bias)
 
 
 func snap() -> void:
@@ -79,9 +108,10 @@ func _update_mode() -> void:
 		in_barrel = false
 		return
 	var d := wave.ahead_of_break(_surfer_u())
-	if in_barrel and (d > barrel_exit or d < -1.0):
+	var tube := wave.size_at(_surfer_u()) >= barrel_min_size and outro < 0.3
+	if in_barrel and (d > barrel_exit or d < -1.0 or not tube):
 		in_barrel = false
-	elif not in_barrel and d < barrel_enter and d > -1.0:
+	elif not in_barrel and d < barrel_enter and d > -1.0 and tube:
 		in_barrel = true
 
 

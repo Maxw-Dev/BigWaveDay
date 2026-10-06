@@ -14,6 +14,13 @@ enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 @export var caught_margin := 1.5      ## Metres behind the break line you may be before the foam has you. Inside the collapsing tube still counts as riding.
 @export var random_direction := true  ## Pick left or right each wave.
 
+@export_group("Wave ending")
+@export var wave_fade_seconds := 8.0  ## Over the last this-many seconds of a timed wave, the whole wave shrinks...
+@export var wave_end_size := 0.18     ## ...down to this fraction of its full size.
+@export var wave_end_margin := 120.0  ## The wave line runs out this many metres past where the break will be at the end. With the 150 m taper, a rider
+									  ## far down the line only meets the shrinking part in the last ~11 s.
+@export var died_size := 0.5          ## Bogging where the wave is smaller than this counts as the wave ending, not a wipeout.
+
 @export_group("Reset flow")
 @export var ending_slowmo := 0.3      ## Time scale while the wipeout plays out.
 @export var ending_seconds := 1.6     ## Real seconds of slow motion before the replay or card.
@@ -76,6 +83,7 @@ var _was_sharp := false
 @onready var camera: ChaseCamera = $ChaseCamera
 @onready var ui: RunUi = $RunUi
 @onready var wind: Wind = get_node_or_null("Wind")
+@onready var backdrop: Backdrop = get_node_or_null("Backdrop")
 
 
 func _ready() -> void:
@@ -116,6 +124,7 @@ func start_wave() -> void:
 	if random_direction:
 		wave.set_direction([1, -1].pick_random())
 	wave.reset()
+	_apply_wave_end()
 	surfer.spawn_rider()
 	surfer.reset(Vector2(start_lead, 0.5), Vector2(spawn_speed, 0.0))
 	surfer.input_enabled = true
@@ -129,9 +138,19 @@ func start_wave() -> void:
 func _physics_process(delta: float) -> void:
 	if state != State.RIDING:
 		return
+	if not surfer.is_live:
+		# Waiting to drop in: the wave waits with you. Nothing can catch you, and the clock has not started.
+		wave.set_physics_process(false)
+		return
+	if not wave.is_physics_processing():
+		wave.set_physics_process(true)
 	ride_time += delta
 	if not endless:
 		time_left -= delta
+		# The wave visibly dies as time runs out: the whole thing shrinks over the last few seconds.
+		var k := clampf(1.0 - time_left / wave_fade_seconds, 0.0, 1.0)
+		wave.set_size(lerpf(1.0, wave_end_size, smoothstep(0.0, 1.0, k)))
+		camera.outro = clampf(k * 2.0, 0.0, 1.0)   # pulled out to the wide shot by halfway through the fade
 	_track_highlights(delta)
 	_record_frame()
 	var reason := ""
@@ -142,7 +161,8 @@ func _physics_process(delta: float) -> void:
 	elif not surfer.forgiving and not surfer.soft_lip and surfer.pos.y > 1.0:
 		reason = "over the lip"
 	elif surfer.pos.y <= 0.0 and surfer.speed() < bog_speed:
-		reason = "bogged in the flats"
+		# If the wave has died under you, that is the end of the wave, not a mistake.
+		reason = "closed out" if wave.size_at(surfer.pos.x) < died_size else "bogged in the flats"
 	if reason != "":
 		wave_over(reason)
 
@@ -181,6 +201,8 @@ func wave_over(reason: String) -> void:
 	surfer.input_enabled = false
 	ui.hide_prompt()
 	Engine.time_scale = ending_slowmo
+	if reason == "caught by the foam" and sfx != null:
+		sfx.wipeout()
 
 
 func _enter_title() -> void:
@@ -196,7 +218,23 @@ func _enter_title() -> void:
 	ui.show_title(_title_mode_text())
 
 
+func _apply_wave_end() -> void:
+	# A timed wave runs out at the home island; an endless one never does. Called per wave, and again when
+	# leaving the title, since endless can be toggled there after the wave was set up.
+	time_left = INF if endless else wave_duration
+	var end_u := INF if endless else wave.peel_speed * wave_duration + wave_end_margin
+	wave.set_size(1.0, end_u)
+	camera.outro = 0.0
+	camera.outro_focus = Vector3.INF
+	if backdrop != null:
+		backdrop.arrange(wave.direction, end_u, endless)
+		wave.set_shallows(backdrop.shallows_center(), backdrop.shallow_radius)
+		if not endless:
+			camera.outro_focus = backdrop.home_focus()
+
+
 func _leave_title() -> void:
+	_apply_wave_end()
 	ui.hide_title()
 	surfer.set_physics_process(true)
 	wave.set_physics_process(true)
@@ -209,7 +247,7 @@ func _leave_title() -> void:
 func _to_title() -> void:
 	Engine.time_scale = 1.0
 	camera.current = true
-	surfer.trail.visible = true
+	surfer.trail.visible = surfer.show_trail
 	ui.set_letterbox(false)
 	ui.hide_card()
 	surfer.set_physics_process(true)
@@ -241,6 +279,7 @@ func _update_title_input(delta: float) -> void:
 func _record_frame() -> void:
 	var f := surfer.capture_frame()
 	f["foam"] = wave.foam_u
+	f["amp"] = wave.amplitude
 	var d := wave.ahead_of_break(surfer.pos.x)
 	f["score"] = surfer.speed() * 0.1 + (1.5 if d < camera.barrel_enter else 0.0) + (0.8 if surfer.is_sharp else 0.0) + (3.0 if surfer.airborne else 0.0) + float(f.glow)
 	_frames.append(f)
@@ -297,6 +336,7 @@ func _replay_aim() -> Vector3:
 func _apply_replay_frame(i: int) -> void:
 	var f: Dictionary = _frames[clampi(i, 0, _frames.size() - 1)]
 	surfer.apply_frame(f)
+	wave.set_size(float(f.get("amp", 1.0)))
 	wave.set_break(float(f.foam))
 
 
@@ -316,7 +356,7 @@ func _end_replay() -> void:
 	# Back to the wipeout moment for the card.
 	_apply_replay_frame(_frames.size() - 1)
 	camera.current = true
-	surfer.trail.visible = true
+	surfer.trail.visible = surfer.show_trail
 	ui.set_letterbox(false)
 	_show_card()
 
@@ -334,7 +374,7 @@ func _show_card() -> void:
 		"closed out":
 			title = "NICE RIDE"
 			colour = Color(0.6, 1.0, 0.75)
-			sub = "The wave closed out. That's the end of it, not a mistake."
+			sub = "The wave ran out by the island. That's the end of it, not a mistake."
 		"caught by the foam":
 			sub = "The whitewater caught you. Pump to stay ahead of the break."
 		"bogged in the flats":

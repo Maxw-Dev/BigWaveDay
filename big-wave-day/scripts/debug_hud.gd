@@ -15,6 +15,8 @@ var run: SurfPrototype
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F3:
 		visible = not visible
+		if surfer != null:
+			surfer.show_trail = visible   # the path line is a debug aid too
 
 
 func _ready() -> void:
@@ -40,7 +42,7 @@ func _process(_delta: float) -> void:
 	lines.append("last pump %.2f   (%.1f s ago)" % [surfer.last_pump_quality, minf(surfer.time_since_pump, 99.9)])
 	var k := wave.steepness(surfer.pos.x)
 	lines.append("height %3.0f%%   %s (steepness %.2f)   ahead of break %.1f m   face %.1f m tall here" % [
-		surfer.pos.y * 100.0, "POCKET" if k > 0.5 else "SHOULDER", k, surfer.pos.x - wave.foam_u, wave.shape.lip_height(wave.ahead_of_break(surfer.pos.x))])
+		surfer.pos.y * 100.0, "POCKET" if k > 0.5 else "SHOULDER", k, surfer.pos.x - wave.foam_u, wave.lip_top(surfer.pos.x)])
 	lines.append("%s on a %s   carve %.0f deg/s   snap %.0f deg/s   drag %.3f" % [surfer.rider_name(), surfer.board_description(), surfer.turn_rate, surfer.sharp_turn_rate, surfer.drag])
 	lines.append("last wave: %s (%.1f s)" % [run.last_reason, run.last_wave_time])
 	lines.append("tap = flip turn   hold = sharp turn   [Space]")

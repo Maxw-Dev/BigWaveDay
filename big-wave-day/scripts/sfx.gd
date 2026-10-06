@@ -16,6 +16,7 @@ const RATE := 22050.0
 @export var pump_sample: AudioStream
 @export var whoosh_sample: AudioStream
 @export var roar_sample: AudioStream
+@export var wipeout_sample: AudioStream
 
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
@@ -36,6 +37,8 @@ func _ready() -> void:
 		whoosh_sample = _whoosh()
 	if roar_sample == null:
 		roar_sample = _roar_loop(2.5)
+	if wipeout_sample == null:
+		wipeout_sample = _crash()
 	for i in range(6):
 		var p := AudioStreamPlayer.new()
 		p.bus = "Master"
@@ -69,6 +72,11 @@ func splash_big() -> void:
 
 func pump(quality: float) -> void:
 	_play(pump_sample, -14.0 + 6.0 * clampf(quality, 0.0, 1.0), 0.95 + 0.12 * clampf(quality, 0.0, 1.0))
+
+
+func wipeout() -> void:
+	# The whitewater landing on you. Pitched down a touch to sit under the slow motion.
+	_play(wipeout_sample, -1.0, 0.9)
 
 
 func whoosh() -> void:
@@ -140,6 +148,29 @@ func _ding() -> AudioStreamWAV:
 		low += (white - low) * 0.07
 		var swell := low * 0.9 * sin(PI * minf(t / 0.45, 1.0))
 		out[i] = (tone * 0.7 + swell) * attack
+	return _to_wav(out, false)
+
+
+func _crash() -> AudioStreamWAV:
+	# A bright splash that darkens into a long churning rumble, with a low thump under the hit.
+	var n := int(2.2 * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var low := 0.0
+	var low2 := 0.0
+	var brown := 0.0
+	var phase := 0.0
+	for i in range(n):
+		var t := float(i) / RATE
+		var white := randf() * 2.0 - 1.0
+		var cutoff := lerpf(0.03, 0.55, exp(-t / 0.35))
+		low += (white - low) * cutoff
+		low2 += (low - low2) * cutoff
+		brown = brown * 0.996 + white * 0.05
+		var env := minf(t / 0.012, 1.0) * (0.75 * exp(-t / 0.45) + 0.25 * exp(-t / 1.4))
+		phase += TAU * lerpf(38.0, 75.0, exp(-t / 0.2)) / RATE
+		var thump := sin(phase) * exp(-t / 0.3) * minf(t / 0.004, 1.0)
+		out[i] = (low2 + brown * 0.6) * env + thump * 0.9
 	return _to_wav(out, false)
 
 

@@ -84,6 +84,7 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 
 @export_group("Debug")
 @export var trail_length := 120
+@export var show_trail := false           ## The orange path line behind the rider. A tuning aid; F3 toggles it with the debug readout.
 @export var override_rider: bool = false
 @export var override_rider_num: int = 0
 
@@ -108,6 +109,7 @@ var _forward := Vector3.RIGHT
 var _bank := 0.0
 var _trail_points := PackedVector3Array()
 var _trail_mesh := ImmediateMesh.new()
+var _spawn_vel := Vector2.ZERO           ## Velocity handed over on the first tap: the drop-in push.
 
 @onready var board: Node3D = $Board
 var rider: Rider
@@ -240,6 +242,7 @@ func board_description() -> String:
 func reset(p: Vector2, v: Vector2) -> void:
 	pos = p
 	vel = v
+	_spawn_vel = v
 	turn_dir = 1
 	hold_time = 0.0
 	is_sharp = false
@@ -280,6 +283,7 @@ func _physics_process(delta: float) -> void:
 				flipped.emit(speed())
 		else:
 			is_live = true   # First press on a fresh wave drops in without flipping: the first arc is a climb.
+			vel = _spawn_vel
 	if input_enabled and _hold_armed and Input.is_action_pressed(ACTION):
 		hold_time += delta
 		is_sharp = hold_time >= sharp_hold_threshold
@@ -319,9 +323,12 @@ func _physics_process(delta: float) -> void:
 	if pos.y <= 0.0:
 		vel -= vel * flat_drag * delta
 
+	if not is_live:
+		vel = Vector2.ZERO   # Waiting to drop in: hold still. The run holds the wave still too.
+
 	# 5. Integrate. Vertical metres become a height fraction of the local face.
 	pos.x += vel.x * delta
-	pos.y += vel.y * delta / wave.arc_length(pos.x)
+	pos.y += vel.y * delta / wave.metres_per_h(pos.x, pos.y)
 	if pos.y > 1.0 and airs_enabled and is_live and vel.y > air_min_vertical and wave.steepness(pos.x) > 0.05:
 		_launch_air()
 		_update_bank(delta)
@@ -333,7 +340,7 @@ func _physics_process(delta: float) -> void:
 		vel.y = minf(vel.y, 0.0)
 		vel -= vel * lip_drag * delta
 	if forgiving:
-		pos.y = maxf(pos.y, -wave.shape.flat_extent / wave.arc_length(pos.x))
+		pos.y = maxf(pos.y, -wave.shape.flat_extent / wave.metres_per_h(pos.x, -1.0))
 		pos.y = minf(pos.y, 1.0)
 	pump_timer = maxf(pump_timer - delta, 0.0)
 	time_since_pump += delta
@@ -531,6 +538,12 @@ func _apply_to_transform() -> void:
 
 
 func _update_trail() -> void:
+	trail.visible = show_trail
+	if not show_trail:
+		if _trail_points.size() > 0:
+			_trail_points.clear()
+			_trail_mesh.clear_surfaces()
+		return
 	_trail_points.push_back(global_position + wave.normal(pos.x, pos.y) * 0.05)
 	while _trail_points.size() > trail_length:
 		_trail_points.remove_at(0)

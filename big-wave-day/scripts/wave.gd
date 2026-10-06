@@ -11,7 +11,7 @@ extends Node3D
 @export var generate_collision := true   ## Adds a StaticBody3D trimesh so physics bodies can stand on the face too.
 @export var u_step := 1.0
 @export var face_rows := 50              ## Rows from trough to lip.
-@export var flat_rows := 20              ## Rows of flat water in front of the trough.
+@export var flat_rows := 0               ## Rows of flat water in front of the trough. 0: the ocean is that water, so there is no seam.
 @export var curl_rows := 24              ## Rows for the folding lip above the face.
 @export var face_color := Color(0.15, 0.45, 0.75)
 @export var water_scroll := Vector2(0.0, -0.06)   ## UV drift per second. Water draws up the face on a real wave.
@@ -20,11 +20,23 @@ extends Node3D
 @export var ocean_color := Color(0.05, 0.22, 0.42)
 
 const FACE_SHADER := preload("res://shaders/water_face.gdshader")
+const OCEAN_SHADER := preload("res://shaders/water_ocean.gdshader")
+
+@export var taper_length := 150.0        ## Metres over which the wave line runs down to nothing at end_u. Long, so the end reads as a decline, not a fin.
+@export var min_size := 0.04             ## Smallest the wave ever gets, as a fraction of full size. Avoids a zero-height face.
 
 var foam_u := 0.0                        ## Position of the break along the wave, metres.
+var amplitude := 1.0                     ## 1 = full wave. The run lowers it as a timed wave runs out.
+var end_u := INF                         ## Metres along the wave where it runs out (at the island). INF = never.
+var _spray_base := Vector3.ZERO
+var _spray_v_min := 4.0
+var _spray_v_max := 9.0
 var _faces := {}                         ## direction -> MeshInstance3D. Both are built once; only one is shown.
 var _face_mat: ShaderMaterial
-var _ocean_mat: StandardMaterial3D
+var _ocean_mat: ShaderMaterial
+var _noise: NoiseTexture2D
+var _shallow_center := Vector3(0.0, 0.0, 1000000.0)
+var _shallow_radius := Vector2(110.0, 115.0)
 
 @onready var face_mesh: MeshInstance3D = $FaceMesh
 @onready var ocean: MeshInstance3D = $Ocean
@@ -50,6 +62,42 @@ func reset() -> void:
 	_place()
 
 
+func set_size(new_amplitude: float, new_end_u: float = end_u) -> void:
+	# Shrink or restore the whole wave. Drawn in the shader, ridden through world_point/arc_length below.
+	amplitude = new_amplitude
+	end_u = new_end_u
+	_push_size_uniforms()
+	_place()
+
+
+func size_at(u: float) -> float:
+	var taper := 1.0
+	if end_u != INF:
+		taper = 1.0 - smoothstep(end_u - taper_length, end_u, u)
+	return maxf(amplitude * taper, min_size)
+
+
+func set_shallows(center: Vector3, radius: Vector2) -> void:
+	# Where the water turns shallow and see-through (around the home island and the end of the wave line).
+	_shallow_center = center
+	_shallow_radius = radius
+	_push_size_uniforms()
+
+
+func _push_size_uniforms() -> void:
+	# Both water materials get the same size and shallows, so the face and the ocean always agree.
+	for mat in [_face_mat, _ocean_mat]:
+		if mat == null:
+			continue
+		mat.set_shader_parameter("amplitude", amplitude)
+		mat.set_shader_parameter("end_u", end_u if end_u != INF else 1000000.0)
+		mat.set_shader_parameter("taper_len", taper_length)
+		mat.set_shader_parameter("wave_dir", float(direction))
+		mat.set_shader_parameter("min_size", min_size)
+		mat.set_shader_parameter("shallow_center", _shallow_center)
+		mat.set_shader_parameter("shallow_radius", _shallow_radius)
+
+
 func set_break(u: float) -> void:
 	# Used by the replay to scrub the break back to where it was.
 	foam_u = u
@@ -69,6 +117,7 @@ func set_direction(dir: int) -> void:
 				child.collision_mask = 1 if active else 0
 	if _faces.has(dir):
 		face_mesh = _faces[dir]
+	_push_size_uniforms()
 	_place()
 
 
@@ -78,15 +127,19 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	# Scrolling noise on the ocean. The face does the same inside its shader.
-	var drift := Vector3(water_scroll.x, water_scroll.y, 0.0) * delta
-	_ocean_mat.uv1_offset += drift
+	pass   # Both water shaders scroll themselves.
 
 
 func _place() -> void:
 	# The mesh lives in the break's frame; the node carries it down the line. The water pattern on it is
 	# world-anchored in the shader, so only the shape appears to move.
 	position = Vector3(foam_u * direction, 0.0, 0.0)
+	if crash_spray != null:
+		# The crash at the break shrinks with the wave.
+		var s := size_at(foam_u)
+		crash_spray.position = Vector3(_spray_base.x, _spray_base.y * s, _spray_base.z * s)
+		crash_spray.initial_velocity_min = _spray_v_min * sqrt(s)
+		crash_spray.initial_velocity_max = _spray_v_max * sqrt(s)
 
 
 # ---- geometry for riders: u = metres along the wave, h = height fraction on the face ----
@@ -101,7 +154,10 @@ func ahead_of_break(u: float) -> float:
 
 func world_point(u: float, h: float) -> Vector3:
 	var p := shape.local_point(ahead_of_break(u), h)
-	return Vector3(u * direction, p.y, p.z)
+	if h <= 0.0:
+		return Vector3(u * direction, p.y, p.z)   # flat water keeps its size, as in the shader
+	var s := size_at(u)
+	return Vector3(u * direction, p.y * s, p.z * s)
 
 
 func tangent_up(u: float, h: float) -> Vector3:
@@ -117,7 +173,13 @@ func slope_angle(u: float, h: float) -> float:
 
 
 func arc_length(u: float) -> float:
-	return shape.arc_length(ahead_of_break(u))
+	# Metres of face from trough to lip here, at the wave's current size.
+	return shape.arc_length(ahead_of_break(u)) * size_at(u)
+
+
+func metres_per_h(u: float, h: float) -> float:
+	# Converts a height fraction to metres along the surface: the face scales with the wave, the flats do not.
+	return arc_length(u) if h > 0.0 else shape.arc_length(ahead_of_break(u))
 
 
 func steepness(u: float) -> float:
@@ -129,6 +191,7 @@ func height_fraction_at_z(u: float, z: float) -> float:
 	var d := ahead_of_break(u)
 	if z >= 0.0:
 		return -z / shape.arc_length(d)
+	z /= size_at(u)
 	var r := shape.arc_radius(d)
 	var a := asin(clampf(-z / r, 0.0, 1.0))
 	return clampf(a / shape.lip_angle(d), 0.0, 1.0)
@@ -136,12 +199,12 @@ func height_fraction_at_z(u: float, z: float) -> float:
 
 func top_height(u: float) -> float:
 	# Highest point of the wave (lip, curl or whitewater) at this point along it.
-	return shape.top_height(ahead_of_break(u))
+	return shape.top_height(ahead_of_break(u)) * size_at(u)
 
 
 func lip_top(u: float) -> float:
 	# Height of the face's lip here, ignoring the curl.
-	return shape.lip_height(ahead_of_break(u))
+	return shape.lip_height(ahead_of_break(u)) * size_at(u)
 
 
 # ---- visuals ----
@@ -196,12 +259,21 @@ func _build_face(dir: int, mi: MeshInstance3D) -> MeshInstance3D:
 func _make_face_material() -> ShaderMaterial:
 	_face_mat = ShaderMaterial.new()
 	_face_mat.shader = FACE_SHADER
-	_face_mat.set_shader_parameter("base_color", face_color)
-	_face_mat.set_shader_parameter("noise_tex", _noise_texture())
-	_face_mat.set_shader_parameter("water_scroll", water_scroll)
+	_apply_water_params(_face_mat)
 	_face_mat.set_shader_parameter("band_length", band_length)
 	_face_mat.set_shader_parameter("band_shade", band_shade)
+	_push_size_uniforms()
 	return _face_mat
+
+
+func _apply_water_params(mat: ShaderMaterial) -> void:
+	# The settings both water shaders share. One noise texture, so the patterns line up exactly.
+	if _noise == null:
+		_noise = _noise_texture()
+	mat.set_shader_parameter("base_color", face_color)
+	mat.set_shader_parameter("ocean_color", ocean_color)
+	mat.set_shader_parameter("noise_tex", _noise)
+	mat.set_shader_parameter("water_scroll", water_scroll)
 
 
 func _setup_ocean() -> void:
@@ -210,16 +282,22 @@ func _setup_ocean() -> void:
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(4000.0, 4000.0)
 	ocean.mesh = plane
-	ocean.global_position = Vector3(0.0, -0.05, 0.0)
-	# PlaneMesh UVs span the whole plane, so scale them to the same 10 m tile the face uses.
-	_ocean_mat = _water_material(ocean_color, 0.72, Vector3(400.0, 400.0, 1.0))
+	ocean.global_position = Vector3(0.0, -0.03, 0.0)
+	# Same water as the face (shared shader include), so there is no line where they meet.
+	_ocean_mat = ShaderMaterial.new()
+	_ocean_mat.shader = OCEAN_SHADER
+	_ocean_mat.render_priority = -10   # transparent, so draw it before spray and wake, which sit on top
+	_apply_water_params(_ocean_mat)
+	_push_size_uniforms()
 	ocean.material_override = _ocean_mat
+	ocean.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _setup_crash_spray() -> void:
 	# Spray fountain where the thrown lip lands, travelling with the break.
 	var impact := shape.local_point(0.0, 2.0)
-	crash_spray.position = Vector3(0.0, maxf(impact.y - 1.0, 0.5), impact.z)
+	_spray_base = Vector3(0.0, maxf(impact.y - 1.0, 0.5), impact.z)
+	crash_spray.position = _spray_base
 	var drop := SphereMesh.new()
 	drop.radius = 0.25
 	drop.height = 0.5
@@ -241,8 +319,8 @@ func _setup_crash_spray() -> void:
 	crash_spray.direction = Vector3(0.0, 1.0, 0.4)
 	crash_spray.spread = 40.0
 	crash_spray.gravity = Vector3(0.0, -9.8, 0.0)
-	crash_spray.initial_velocity_min = 4.0
-	crash_spray.initial_velocity_max = 9.0
+	crash_spray.initial_velocity_min = _spray_v_min
+	crash_spray.initial_velocity_max = _spray_v_max
 	crash_spray.scale_amount_min = 0.7
 	crash_spray.scale_amount_max = 1.8
 	crash_spray.color_ramp = fade
@@ -258,19 +336,3 @@ func _noise_texture() -> NoiseTexture2D:
 	tex.noise = noise
 	tex.seamless = true
 	return tex
-
-
-func _water_material(color: Color, dark: float, uv_scale: Vector3) -> StandardMaterial3D:
-	# Glossy surface with a seamless scrolling noise tint. `dark` is how dark the noise troughs get (1 = no noise).
-	var tex := _noise_texture()
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(dark, dark, dark))
-	ramp.set_color(1, Color.WHITE)
-	tex.color_ramp = ramp
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.albedo_texture = tex
-	mat.uv1_scale = uv_scale
-	mat.roughness = 0.18
-	mat.metallic_specular = 0.7
-	return mat
