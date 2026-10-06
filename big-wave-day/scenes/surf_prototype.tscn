@@ -40,7 +40,6 @@ shadow_enabled = true
 turn_rate = 140.0
 sharp_turn_rate = 375.0
 gravity = 9.5
-override_rider = false
 
 [node name="ChaseCamera" type="Camera3D" parent="." unique_id=1980096021]
 current = true
@@ -69,8 +68,10 @@ theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 18
 text = "debug"
 
-[node name="RunUi" type="CanvasLayer" parent="." unique_id=961192736]
+[node name="RunUi" type="CanvasLayer" parent="." unique_id=961192736 node_paths=PackedStringArray("surfer", "cam")]
 script = ExtResource("6_ui")
+surfer = NodePath("../Surfer")
+cam = NodePath("../ChaseCamera")
 
 [node name="Wind" type="AudioStreamPlayer" parent="." unique_id=488478015]
 script = ExtResource("7_wind")

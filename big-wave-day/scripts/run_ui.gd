@@ -22,6 +22,11 @@ var _title_mode: Label
 
 const SPEED_SHADER := preload("res://shaders/speed_lines.gdshader")
 
+@export var surfer: Surfer
+@export var cam: ChaseCamera
+var _board_background: MeshInstance3D
+var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
+
 
 func _ready() -> void:
 	layer = 5
@@ -104,6 +109,12 @@ func _ready() -> void:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(l)
 	_continue.modulate.a = 0.0
+	
+	_board_background = MeshInstance3D.new()
+	_card.add_child(_board_background)
+	_board_background.rotation_order=EULER_ORDER_ZYX
+	_board_background.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	
 
 	# Title screen.
 	_title_box = _full_rect(Control.new())
@@ -160,10 +171,81 @@ func show_card(title: String, colour: Color, subtitle: String, lines: PackedStri
 	tw.tween_property(_card, "modulate:a", 1.0, 0.3)
 	tw.tween_interval(maxf(continue_after - 0.3, 0.0))
 	tw.tween_property(_continue, "modulate:a", 1.0, 0.3)
+	
+	#var mesh = BoxMesh.new()
+	board_look = surfer.board_look
+	_board_background.material_override = surfer.board.material_override
+	
+	_board_background.mesh = _build_board_mesh(board_look.length, surfer.board_width, surfer.board_thickness)
+	
+	_board_background.quaternion = cam.quaternion
+	_board_background.rotate(cam.basis.x, -PI/2)
+	_board_background.rotate(cam.basis.z, PI/2)
+	_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.7, (board_look.length - 2.15) / 1.25)
+	_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
 
+func _build_board_mesh(length: float, width: float, thick: float) -> ArrayMesh:
+	# A surfboard lofted from elliptical rail sections: pointed nose at -Z (forward), wider ahead of the
+	# middle, narrower rounded tail at +Z, a little rocker. No modelling tool needed.
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n_len := 28
+	var n_around := 14
+	for i in range(n_len + 1):
+		var t := float(i) / n_len                     # 0 = tail, 1 = nose
+		var z := (0.5 - t) * length
+		var half_w := width * 0.5 * _board_outline(t)
+		var half_t := thick * 0.5 * _board_thickness(t)
+		var rocker := 0.045 * length * pow(absf(t - 0.45) / 0.55, 2.2)
+		for j in range(n_around):
+			var a := TAU * float(j) / n_around
+			var col: Color = board_look.get("deck", Color(1.0, 0.45, 0.05))
+			if t > 0.86:
+				col = board_look.get("tip", col)
+			elif board_look.get("has_stripe", false) and sin(a) > 0.0 and absf(cos(a)) < 0.28:
+				col = board_look.get("stripe", col)
+			st.set_color(col)
+			st.add_vertex(Vector3(cos(a) * half_w, sin(a) * half_t + rocker, z))
+	for i in range(n_len):
+		for j in range(n_around):
+			var a := i * n_around + j
+			var b := i * n_around + (j + 1) % n_around
+			var c := a + n_around
+			var d := b + n_around
+			st.add_index(a)
+			st.add_index(b)
+			st.add_index(c)
+			st.add_index(b)
+			st.add_index(d)
+			st.add_index(c)
+	st.generate_normals()
+	return st.commit()
+
+func _board_outline(t: float) -> float:
+	# Half-width factor along the board. Widest at 45% from the tail, elliptical taper to the nose point,
+	# gentle pull-in to a rounded tail.
+	var nose := 1.0
+	if t > 0.45:
+		var q := (t - 0.45) / 0.55
+		nose = sqrt(maxf(1.0 - q * q, 0.0))
+	var tail := lerpf(0.62, 1.0, smoothstep(0.0, 0.45, t)) * sqrt(smoothstep(0.0, 0.07, t))
+	return nose * tail
+
+func _board_thickness(t: float) -> float:
+	var q := (t - 0.5) / 0.5
+	return maxf(sqrt(maxf(1.0 - q * q, 0.0)), 0.12)
+
+func _process(_delta: float) -> void:
+	if (_card.visible):
+		_board_background.quaternion = cam.quaternion
+		_board_background.rotate(cam.basis.x, -PI/2)
+		_board_background.rotate(cam.basis.z, PI/2)
+		_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.7, (board_look.length - 2.15) / 1.25)
+		_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
 
 func hide_card() -> void:
 	_card.visible = false
+	_board_background.mesh = null
 
 
 func show_title(mode_text: String) -> void:

@@ -17,7 +17,7 @@ enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 @export_group("Reset flow")
 @export var ending_slowmo := 0.3      ## Time scale while the wipeout plays out.
 @export var ending_seconds := 1.6     ## Real seconds of slow motion before the replay or card.
-@export var card_min_seconds := 1.2   ## The card cannot be dismissed before this.
+@export var card_min_seconds := 0.7   ## The card cannot be dismissed before this.
 @export var card_auto_seconds := 5.0  ## The card dismisses itself after this.
 @export var card_hold_toggle := 0.8   ## Holding this long on the card toggles endless mode.
 @export var fade_seconds := 0.35
@@ -371,8 +371,8 @@ func _update_card_input(delta: float) -> void:
 		if was_tap and _state_t >= card_min_seconds:
 			_restart()
 		return
-	if _state_t >= card_auto_seconds:
-		_restart()
+	#if _state_t >= card_auto_seconds:
+		#_restart()
 
 
 func _update_feel_overlays() -> void:
