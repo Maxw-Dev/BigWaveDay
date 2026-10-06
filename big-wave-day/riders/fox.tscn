@@ -9,6 +9,7 @@ script = ExtResource("1_em2ql")
 y_offset = 0.59
 scale_mod = 1.5
 rider_width = 0.8
+end_screen_color = Color(0.9611141, 0.53163975, 0.2976141, 1)
 model = NodePath("Fox")
 stats = ExtResource("2_em2ql")
 

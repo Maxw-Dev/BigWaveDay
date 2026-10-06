@@ -8,7 +8,7 @@ var _card: Control
 var _card_bg: ColorRect
 var _title: Label
 var _subtitle: Label
-var _highlights: Label
+var _highlights: RichTextLabel
 var _continue: Label
 var _prompt: Label
 var _hint: Label
@@ -25,6 +25,7 @@ const SPEED_SHADER := preload("res://shaders/speed_lines.gdshader")
 @export var surfer: Surfer
 @export var cam: ChaseCamera
 var _board_background: MeshInstance3D
+var _board_background_show_time: float
 var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
 
 
@@ -102,7 +103,7 @@ func _ready() -> void:
 	centre.add_child(box)
 	_title = _label(52, Color(1, 1, 1))
 	_subtitle = _label(24, Color(0.9, 0.95, 1.0))
-	_highlights = _label(24, Color(1, 1, 1))
+	_highlights = _rich_text_label(24, Color(1, 1, 1))
 	_continue = _label(22, Color(0.8, 0.9, 1.0))
 	_mode = _label(20, Color(0.75, 0.85, 0.95))
 	for l in [_title, _subtitle, _highlights, _continue, _mode]:
@@ -172,6 +173,7 @@ func show_card(title: String, colour: Color, subtitle: String, lines: PackedStri
 	tw.tween_interval(maxf(continue_after - 0.3, 0.0))
 	tw.tween_property(_continue, "modulate:a", 1.0, 0.3)
 	
+	
 	#var mesh = BoxMesh.new()
 	board_look = surfer.board_look
 	_board_background.material_override = surfer.board.material_override
@@ -181,8 +183,10 @@ func show_card(title: String, colour: Color, subtitle: String, lines: PackedStri
 	_board_background.quaternion = cam.quaternion
 	_board_background.rotate(cam.basis.x, -PI/2)
 	_board_background.rotate(cam.basis.z, PI/2)
-	_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.7, (board_look.length - 2.15) / 1.25)
+	_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.55, (board_look.length - 2.15) / 1.25)
 	_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
+	
+	_board_background_show_time = 0
 
 func _build_board_mesh(length: float, width: float, thick: float) -> ArrayMesh:
 	# A surfboard lofted from elliptical rail sections: pointed nose at -Z (forward), wider ahead of the
@@ -235,13 +239,21 @@ func _board_thickness(t: float) -> float:
 	var q := (t - 0.5) / 0.5
 	return maxf(sqrt(maxf(1.0 - q * q, 0.0)), 0.12)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if (_card.visible):
+		if _board_background_show_time <= 0.3:
+			_board_background_show_time += delta
 		_board_background.quaternion = cam.quaternion
 		_board_background.rotate(cam.basis.x, -PI/2)
 		_board_background.rotate(cam.basis.z, PI/2)
-		_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.7, (board_look.length - 2.15) / 1.25)
+		_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.55, (board_look.length - 2.15) / 1.25)
 		_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
+		_board_background.position += cam.global_basis.x * lerpf(-5, 0, _easeOutBack(min(_board_background_show_time, 0.3) / 0.3))
+
+func _easeOutBack(x: float) -> float:
+	const c1 = 1.70158
+	const c3 = c1 + 1
+	return 1 + c3 * pow(x - 1, 3) + c1 * pow(x - 1, 2)
 
 func hide_card() -> void:
 	_card.visible = false
@@ -300,5 +312,18 @@ func _label(size: int, colour: Color) -> Label:
 	l.add_theme_color_override("font_color", colour)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
 	l.add_theme_constant_override("outline_size", 8)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+func _rich_text_label(size: int, colour: Color) -> RichTextLabel:
+	var l := RichTextLabel.new()
+	l.add_theme_font_size_override("normal_font_size", 18)
+	l.add_theme_font_size_override("bold_font_size", 22)
+	l.add_theme_color_override("font_color", colour)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	l.add_theme_constant_override("outline_size", 8)
+	l.fit_content = true
+	l.scroll_active = false
+	l.bbcode_enabled = true
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l

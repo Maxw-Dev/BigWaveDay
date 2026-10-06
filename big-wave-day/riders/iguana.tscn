@@ -2,14 +2,15 @@
 
 [ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_8s43a"]
 [ext_resource type="PackedScene" uid="uid://cq317w87nxgrq" path="res://models/Iguana.blend" id="2_8s43a"]
-[ext_resource type="Resource" path="res://riders/stats_iguana.tres" id="9_stats"]
+[ext_resource type="Resource" uid="uid://dmgjcpx4n2jsp" path="res://riders/stats_iguana.tres" id="9_stats"]
 
 [node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
 script = ExtResource("1_8s43a")
-stats = ExtResource("9_stats")
 y_offset = 0.38
 scale_mod = 0.34
 rider_width = 1.0
+end_screen_color = Color(0.36078432, 0.49019608, 0.2, 1)
 model = NodePath("Iguana")
+stats = ExtResource("9_stats")
 
 [node name="Iguana" parent="." unique_id=866921033 instance=ExtResource("2_8s43a")]

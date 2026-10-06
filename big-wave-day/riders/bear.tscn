@@ -9,6 +9,7 @@ script = ExtResource("1_ck7mo")
 y_offset = 0.48
 scale_mod = 0.86
 rider_width = 1.0
+end_screen_color = Color(0.8186259, 0.91547, 0.936348, 1)
 model = NodePath("Bear")
 stats = ExtResource("2_ck7mo")
 

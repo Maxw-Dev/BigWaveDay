@@ -342,9 +342,11 @@ func _show_card() -> void:
 		"over the lip":
 			sub = "You went over the back."
 	var lines := PackedStringArray()
-	lines.append("%s on a %s   ·   %.0f s ride" % [surfer.rider_name(), surfer.board_description(), last_wave_time])
-	lines.append("Top speed %.1f m/s   ·   Longest barrel %.1f s   ·   Biggest air %.1f m" % [top_speed, longest_barrel, biggest_air])
-	lines.append("%d airs   ·   %d snaps   ·   %.0f s in the pocket" % [air_count, sharp_turns, pocket_seconds])
+	var top_line: String = "[b][color=#%s]%s [/color][/b]on a[b][color=#%s] %s[/color][/b]   ·   %.0f s ride" % [surfer.rider.end_screen_color.to_html(false), surfer.rider_name(), surfer.board_color.to_html(false), surfer.board_description(), last_wave_time]
+	lines.append(top_line)
+	lines.append("[b][color=goldenrod]%d airs[/color][/b]   ·   Biggest air %.1f m" % [air_count, biggest_air])
+	lines.append("Longest barrel %.1f s   ·   %.0f s in the pocket" % [longest_barrel, pocket_seconds])
+	lines.append("Top speed %.1f m/s   ·   %d snaps" % [top_speed, sharp_turns])
 	ui.show_card(title, colour, sub, lines, "TAP to ride again", card_min_seconds)
 	_card_hold = 0.0
 	_card_toggled = false

@@ -131,6 +131,7 @@ var _land_blend := 0.0
 var _land_from_forward := Vector3.RIGHT
 var _land_from_up := Vector3.UP
 var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
+var board_color: Color
 var _rider_index := -1
 @onready var spray: CPUParticles3D = $Board/Spray
 @onready var burst: CPUParticles3D = $Board/SharpBurst
@@ -586,6 +587,8 @@ func _setup_board() -> void:
 	for n in names:
 		if names[n].is_equal_approx(deck):
 			deck_name = n
+			board_color = n
+			print(board_color)
 	board_look = {"deck": deck, "stripe": stripe, "has_stripe": randf() < 0.6, "tip": stripe if randf() < 0.5 else deck.darkened(0.3),
 		"length": board_length, "name": deck_name}
 	board.mesh = _build_board_mesh(board_look.length, board_width, board_thickness)

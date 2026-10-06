@@ -8,6 +8,7 @@
 script = ExtResource("1_lcynx")
 y_offset = 0.5
 scale_mod = 0.42
+end_screen_color = Color(0.8627451, 0.3882353, 0.23529412, 1)
 model = NodePath("Owl")
 stats = ExtResource("2_lcynx")
 

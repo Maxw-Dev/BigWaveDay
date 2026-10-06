@@ -2,14 +2,15 @@
 
 [ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_5h4qj"]
 [ext_resource type="PackedScene" uid="uid://baasf27wlnskl" path="res://models/Basilisk.blend" id="2_5h4qj"]
-[ext_resource type="Resource" path="res://riders/stats_basilisk.tres" id="9_stats"]
+[ext_resource type="Resource" uid="uid://cylp8yj5jm5ru" path="res://riders/stats_basilisk.tres" id="9_stats"]
 
 [node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
 script = ExtResource("1_5h4qj")
-stats = ExtResource("9_stats")
 y_offset = 0.38
 scale_mod = 0.34
 rider_width = 1.0
+end_screen_color = Color(0.37254903, 0.7490196, 0.29803923, 1)
 model = NodePath("Basilisk")
+stats = ExtResource("9_stats")
 
 [node name="Basilisk" parent="." unique_id=35922899 instance=ExtResource("2_5h4qj")]

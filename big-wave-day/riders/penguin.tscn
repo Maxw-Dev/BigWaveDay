@@ -2,13 +2,14 @@
 
 [ext_resource type="PackedScene" uid="uid://cxhhpgoepxe1x" path="res://models/Penguin.blend" id="1_36rbs"]
 [ext_resource type="Script" uid="uid://bn3agjgu08b34" path="res://riders/rider.gd" id="1_prq75"]
-[ext_resource type="Resource" path="res://riders/stats_penguin.tres" id="9_stats"]
+[ext_resource type="Resource" uid="uid://2ow84etkw0cm" path="res://riders/stats_penguin.tres" id="9_stats"]
 
 [node name="Rider" type="Node3D" unique_id=1717873965 node_paths=PackedStringArray("model")]
 script = ExtResource("1_prq75")
-stats = ExtResource("9_stats")
 y_offset = 0.54
 scale_mod = 0.42
+end_screen_color = Color(0.8140698, 0.8363281, 0.35322005, 1)
 model = NodePath("Penguin")
+stats = ExtResource("9_stats")
 
 [node name="Penguin" parent="." unique_id=1307197294 instance=ExtResource("1_36rbs")]
