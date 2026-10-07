@@ -7,8 +7,8 @@
 [ext_resource type="Script" uid="uid://b8n6sxfpgr13x" path="res://scripts/debug_hud.gd" id="5_hud"]
 [ext_resource type="Script" uid="uid://cm0hm5fn4qyq1" path="res://scripts/run_ui.gd" id="6_ui"]
 [ext_resource type="Script" uid="uid://ccxb0hdinqelr" path="res://scripts/wind.gd" id="7_wind"]
-[ext_resource type="Script" path="res://scripts/backdrop.gd" id="8_backdrop"]
-[ext_resource type="PackedScene" path="res://models/Boat.blend" id="9_boat"]
+[ext_resource type="Script" uid="uid://2qqeigrm61nv" path="res://scripts/backdrop.gd" id="8_backdrop"]
+[ext_resource type="PackedScene" uid="uid://cshixljai6moe" path="res://models/Boat.blend" id="9_boat"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_material"]
 sky_top_color = Color(0.2, 0.45, 0.85, 1)
@@ -82,6 +82,6 @@ cam = NodePath("../ChaseCamera")
 [node name="Wind" type="AudioStreamPlayer" parent="." unique_id=488478015]
 script = ExtResource("7_wind")
 
-[node name="Backdrop" type="Node3D" parent="."]
+[node name="Backdrop" type="Node3D" parent="." unique_id=2010554308]
 script = ExtResource("8_backdrop")
 boat_scene = ExtResource("9_boat")

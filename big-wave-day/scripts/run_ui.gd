@@ -27,6 +27,7 @@ const SPEED_SHADER := preload("res://shaders/speed_lines.gdshader")
 var _board_background: MeshInstance3D
 var _board_background_show_time: float
 var board_look := {}                      ## deck, stripe, tip colours and length, rolled per spawn.
+var _board_background_light: OmniLight3D
 
 
 func _ready() -> void:
@@ -116,6 +117,16 @@ func _ready() -> void:
 	_board_background.rotation_order=EULER_ORDER_ZYX
 	_board_background.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_board_background.sorting_offset = 20.0
+	_board_background.layers = 16
+	
+	_board_background_light = OmniLight3D.new()
+	_board_background_light.light_color = Color.WHITE
+	_board_background_light.omni_range = 8
+	_board_background_light.omni_attenuation = -0.2
+	_board_background_light.light_energy = 8.5
+	_board_background_light.light_cull_mask = 16
+	
+	_card.add_child(_board_background_light)
 	
 	
 	# Title screen.
@@ -250,6 +261,9 @@ func _process(delta: float) -> void:
 		_board_background.position = cam.position + cam.global_basis.z * lerpf(-0.9, -1.55, (board_look.length - 2.15) / 1.25)
 		_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
 		_board_background.position += cam.global_basis.x * lerpf(-5, 0, _easeOutBack(min(_board_background_show_time, 0.3) / 0.3))
+		
+		_board_background_light.position = cam.position + cam.global_basis.z * 5
+		_board_background_light.quaternion = cam.quaternion
 
 func _easeOutBack(x: float) -> float:
 	const c1 = 1.70158

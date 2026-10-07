@@ -384,7 +384,8 @@ func _show_card() -> void:
 	var lines := PackedStringArray()
 	var top_line: String = "[b][color=#%s]%s [/color][/b]on a[b][color=#%s] %s[/color][/b]   ·   %.0f s ride" % [surfer.rider.end_screen_color.to_html(false), surfer.rider_name(), surfer.board_color.to_html(false), surfer.board_description(), last_wave_time]
 	lines.append(top_line)
-	lines.append("[b][color=goldenrod]%d airs[/color][/b]   ·   Biggest air %.1f m" % [air_count, biggest_air])
+	if (air_count == 1): lines.append("[b][color=goldenrod]%d air[/color][/b]   ·   Biggest air %.1f m" % [air_count, biggest_air])
+	else: lines.append("[b][color=goldenrod]%d airs[/color][/b]   ·   Biggest air %.1f m" % [air_count, biggest_air])
 	lines.append("Longest barrel %.1f s   ·   %.0f s in the pocket" % [longest_barrel, pocket_seconds])
 	lines.append("Top speed %.1f m/s   ·   %d snaps" % [top_speed, sharp_turns])
 	ui.show_card(title, colour, sub, lines, "TAP to ride again", card_min_seconds)
