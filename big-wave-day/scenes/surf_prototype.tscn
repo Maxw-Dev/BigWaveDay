@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://ccxb0hdinqelr" path="res://scripts/wind.gd" id="7_wind"]
 [ext_resource type="Script" uid="uid://2qqeigrm61nv" path="res://scripts/backdrop.gd" id="8_backdrop"]
 [ext_resource type="PackedScene" uid="uid://cshixljai6moe" path="res://models/Boat.blend" id="9_boat"]
+[ext_resource type="AudioStream" uid="uid://b1apvpatoxah1" path="res://sounds/Big Wave Day.mp3" id="10_tk74s"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_material"]
 sky_top_color = Color(0.2, 0.45, 0.85, 1)
@@ -74,10 +75,11 @@ theme_override_constants/outline_size = 6
 theme_override_font_sizes/font_size = 18
 text = "debug"
 
-[node name="RunUi" type="CanvasLayer" parent="." unique_id=961192736 node_paths=PackedStringArray("surfer", "cam")]
+[node name="RunUi" type="CanvasLayer" parent="." unique_id=961192736 node_paths=PackedStringArray("surfer", "cam", "music")]
 script = ExtResource("6_ui")
 surfer = NodePath("../Surfer")
 cam = NodePath("../ChaseCamera")
+music = NodePath("../AudioStreamPlayer")
 
 [node name="Wind" type="AudioStreamPlayer" parent="." unique_id=488478015]
 script = ExtResource("7_wind")
@@ -85,3 +87,8 @@ script = ExtResource("7_wind")
 [node name="Backdrop" type="Node3D" parent="." unique_id=2010554308]
 script = ExtResource("8_backdrop")
 boat_scene = ExtResource("9_boat")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1837880118]
+stream = ExtResource("10_tk74s")
+volume_db = -3.0
+autoplay = true

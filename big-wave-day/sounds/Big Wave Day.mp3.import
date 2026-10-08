@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://b1apvpatoxah1"
+path="res://.godot/imported/Big Wave Day.mp3-8beec4ed920b262a50830ff8ce1aaee1.mp3str"
+
+[deps]
+
+source_file="res://sounds/Big Wave Day.mp3"
+dest_files=["res://.godot/imported/Big Wave Day.mp3-8beec4ed920b262a50830ff8ce1aaee1.mp3str"]
+
+[params]
+
+loop=true
+loop_offset=23.606
+bpm=122.0
+beat_count=0
+bar_beats=4

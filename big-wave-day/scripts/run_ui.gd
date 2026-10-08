@@ -30,6 +30,10 @@ var board_look := {}                      ## deck, stripe, tip colours and lengt
 var _board_background_light: OmniLight3D
 
 
+@export var music: AudioStreamPlayer
+
+
+
 func _ready() -> void:
 	layer = 5
 	_speed_lines = _full_rect(ColorRect.new())
@@ -199,6 +203,9 @@ func show_card(title: String, colour: Color, subtitle: String, lines: PackedStri
 	_board_background.position += cam.global_basis.x * lerpf(0.1, -0.05, (board_look.length - 2.15) / 1.25)
 	
 	_board_background_show_time = 0
+	
+	var tw2 := create_tween()
+	tw2.tween_property(music, "volume_db", -5.0, 0.3)
 
 func _build_board_mesh(length: float, width: float, thick: float) -> ArrayMesh:
 	# A surfboard lofted from elliptical rail sections: pointed nose at -Z (forward), wider ahead of the
@@ -273,6 +280,9 @@ func _easeOutBack(x: float) -> float:
 func hide_card() -> void:
 	_card.visible = false
 	_board_background.mesh = null
+	
+	var tw2 := create_tween()
+	tw2.tween_property(music, "volume_db", -3.0, 0.3)
 
 
 func show_title(mode_text: String) -> void:
@@ -298,6 +308,10 @@ func set_letterbox(on: bool) -> void:
 	var h := 0.11 if on else 0.0
 	tw.tween_property(_bar_top, "anchor_bottom", h, 0.35)
 	tw.tween_property(_bar_bottom, "anchor_top", 1.0 - h, 0.35)
+	
+	var tw2 := create_tween()
+	if on:
+		tw2.tween_property(music, "volume_db", 1.0, 0.3)
 
 
 func set_mode_text(text: String) -> void:
