@@ -23,9 +23,18 @@ uniform float deep_height = 0.55;        // height fraction where the base colou
 uniform vec3 lip_glow_color : source_color = vec3(0.3, 0.95, 0.8); // sunlight through the thin top of the wave
 uniform float lip_glow = 0.6;            // strength of that glow, 0 = off
 uniform float foam_glow = 0.3;           // whitewater lights itself a little, so it stays white in shadow instead of going grey
+// The face read as a body from the front: a lit crest edge, the shadow under an overhanging lip, ribs of water
+// rushing up the face, and threads of old foam low down. All shading; the ridden surface does not move.
+uniform float crest_line = 0.5;          // brightness of the thin highlight along the very top of the face
+uniform float lip_shade = 0.3;           // how dark the band just under the lip gets on a steep section (0 = off)
+uniform float rib_strength = 0.35;       // vertical ribs: normal bend and brightness, 0 = off
+uniform float rib_scale = 0.5;           // ribs per metre along the wave (0.5 = a rib every ~2 m)
+uniform float lace = 0.16;               // foam threads on the lower face and the flats, 0 = off
+uniform float lace_height = 0.45;        // height fraction below which the lace lives
 uniform float lip_glow_start = 0.6;      // height fraction where the glow begins
 
 varying vec3 world_pos;
+varying float face_up;   // world-up component of the surface normal: 1 flat, 0 vertical, < 0 overhanging
 
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -46,6 +55,7 @@ void vertex() {
 		VERTEX += NORMAL * ln * amp * s;
 	}
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	face_up = NORMAL.y;
 }
 
 void fragment() {
@@ -65,7 +75,13 @@ void fragment() {
 	float chop_fade = (1.0 - smoothstep(chop_near, chop_far, length(VERTEX))) * smoothstep(0.08, 0.35, abs(dot(NORMAL, VIEW)))
 		* (1.0 - smoothstep(0.88, 0.97, COLOR.a));   // and not on the lip itself, where the surface folds over
 	vec2 slope = clamp(vec2(dFdx(chop), dFdy(chop)), vec2(-0.04), vec2(0.04));   // bounded: no single pixel can flip the normal
-	vec3 bumped = normalize(NORMAL - vec3(slope, 0.0) * chop_strength * 12.0 * chop_fade);
+	// Ribs: streaks running up the face (world x across, y - z up), bending the normal sideways so they catch
+	// light as vertical bands. Strongest mid-face, gone on the flats and the lip.
+	float rib_n = texture(noise_tex, vec2(world_pos.x * rib_scale, (world_pos.y - world_pos.z) * 0.06 + TIME * 0.05)).r;
+	float rib_mask = rib_strength * smoothstep(0.05, 0.3, COLOR.a) * (1.0 - smoothstep(0.85, 1.0, COLOR.a)) * (1.0 - smoothstep(chop_far, chop_far * 2.5, length(VERTEX)));
+	float rib_dx = clamp(dFdx(rib_n), -0.03, 0.03);
+	vec3 bumped = normalize(NORMAL - vec3(slope, 0.0) * chop_strength * 12.0 * chop_fade - vec3(rib_dx * 20.0 * rib_mask, 0.0, 0.0));
+	water *= 1.0 + (rib_n - 0.5) * 0.16 * rib_mask;
 
 	float churn = texture(noise_tex, base_uv * 2.0 + foam_scroll * TIME).r;
 	float churn_fine = texture(noise_tex, base_uv * 7.0 + foam_scroll * 1.7 * TIME).r;   // boils inside the pile
@@ -88,11 +104,21 @@ void fragment() {
 
 	// Sunlight through the top of the wave: a turquoise glow that strengthens toward the lip, on the lip
 	// tongue, and at grazing angles where the water is seen edge-on and thin.
+	// Lip shadow: the band under the crest darkens as the face steepens past vertical (the lip hangs over it).
+	float overhang = smoothstep(0.35, -0.25, face_up);
+	float under_lip = smoothstep(0.7, 0.9, h) * (1.0 - smoothstep(0.93, 0.985, h));
+	water *= 1.0 - lip_shade * overhang * under_lip;
+	// Foam lace: thin threads of old foam low on the face and on the flats, drifting slowly.
+	float lace_n = texture(noise_tex, base_uv * 3.0 + vec2(0.02, -0.03) * TIME).r;
+	float threads = smoothstep(0.045, 0.0, abs(lace_n - 0.5)) * lace * (1.0 - smoothstep(lace_height * 0.6, lace_height, h));
+	foam = max(foam, threads * 0.8);
+	// Crest line: a thin lit edge along the very top of the face.
+	float crest = smoothstep(0.955, 0.985, h) * (1.0 - smoothstep(0.995, 1.0, h)) * crest_line;
 	float rim = pow(1.0 - abs(dot(NORMAL, VIEW)), 2.0);
 	float thin = max(smoothstep(lip_glow_start, 1.0, h), fold * 0.8);
 	float glow = lip_glow * thin * (0.45 + 0.55 * rim) * (1.0 - foam);
 	ALBEDO = mix(water, foam_col, foam);
-	EMISSION = lip_glow_color * glow + foam_col * foam * foam_glow;
+	EMISSION = lip_glow_color * glow + foam_col * foam * foam_glow + vec3(0.8, 1.0, 1.0) * crest * (1.0 - foam);
 	NORMAL = mix(bumped, NORMAL, foam);
 	ROUGHNESS = mix(roughness_value, 0.9, foam);
 	SPECULAR = mix(specular_value, 0.3, foam);
