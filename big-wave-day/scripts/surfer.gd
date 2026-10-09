@@ -34,6 +34,7 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 @export var gravity_scale := 0.7          ## 1.0 makes mid-face gravity match the turn authority and the face plays like a wall.
 @export var drag := 0.02                  ## Quadratic drag per metre. 2 m/s^2 at 10 m/s.
 @export var sharp_drag_extra := 0.08      ## Added to drag while sharp: the speed scrub.
+@export var sharp_scrub_fade_deg := 40.0  ## The scrub fades out as the heading rises to this angle: a held bottom turn drives up the face at speed; a snap at the top still scrubs on the way down.
 @export var flat_drag := 0.8              ## Linear drag per second on the flats (s <= 0). Makes bogging real.
 
 @export_group("Pumping")
@@ -57,6 +58,10 @@ signal air_landed(height: float, spin_deg: float, clean: bool)
 @export_group("Airs")
 @export var airs_enabled := true
 @export var air_min_vertical := 1.5        ## m/s of climb at the lip needed to leave the face. Slower than this rides the lip instead.
+@export var climb_gravity_keep := 0.45     ## Fraction of gravity felt on a straight climb for an air (the face pushes you up). 1 = no help. Carving turns are unaffected.
+@export var climb_drag_keep := 0.5         ## Fraction of drag felt on that climb.
+@export var climb_assist_from_deg := 45.0  ## Heading where the climb help starts (0 = down the line, 90 = straight up)...
+@export var climb_assist_full_deg := 70.0  ## ...and where it is full.
 @export var air_gravity_scale := 1.0       ## Airs under normal gravity: a fast launch goes three-plus metres over the lip. Raise to shorten.
 @export var air_land_h := 0.5              ## Height fraction of the face you come back down onto.
 @export var air_land_heading_deg := -20.0  ## Heading you land with: slightly down the line, so speed carries.
@@ -291,6 +296,7 @@ func _physics_process(delta: float) -> void:
 		is_sharp = false
 		hold_time = 0.0
 
+	var climb := 0.0   # 0..1, how much this tick is a straight climb for an air
 	if airborne:
 		_air_step(delta)
 		_update_bank(delta)
@@ -313,12 +319,16 @@ func _physics_process(delta: float) -> void:
 				vel += vel.normalized() * dose
 				_pump_left -= dose
 
-		# 3. Gravity along the face: zero on the flats, full g on a vertical section.
-		var g_along := gravity * gravity_scale * sin(wave.slope_angle(pos.x, pos.y))
+		# 3. Gravity along the face: zero on the flats, full g on a vertical section. A committed straight climb
+		# for an air feels less of it, and less drag, so you reach the lip with the speed you built.
+		climb = smoothstep(climb_assist_from_deg, climb_assist_full_deg, heading_deg())
+		var g_along := gravity * gravity_scale * sin(wave.slope_angle(pos.x, pos.y)) * lerpf(1.0, climb_gravity_keep, climb)
 		vel.y -= g_along * delta
 
-	# 4. Drag: quadratic, plus the sharp-turn scrub, plus sticky flats.
-	var k := drag + (sharp_drag_extra if is_sharp else 0.0)
+	# 4. Drag: quadratic, plus the sharp-turn scrub, plus sticky flats. The scrub is the snap: it bites while
+	# turning down the face, not while driving up out of a bottom turn. Eased further on the climb for an air.
+	var scrub := sharp_drag_extra * (1.0 - smoothstep(0.0, sharp_scrub_fade_deg, heading_deg())) if is_sharp else 0.0
+	var k := (drag + scrub) * lerpf(1.0, climb_drag_keep, climb)
 	vel -= vel * vel.length() * k * delta
 	if pos.y <= 0.0:
 		vel -= vel * flat_drag * delta

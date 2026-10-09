@@ -8,11 +8,12 @@ extends Node3D
 @export var shape: WaveShape
 @export_enum("Left:1", "Right:-1") var direction: int = 1
 @export var peel_speed := 6.2            ## m/s the break advances along the wave. Close to cruising speed, so only real pumping pulls ahead.
-@export var generate_collision := true   ## Adds a StaticBody3D trimesh so physics bodies can stand on the face too.
+@export var generate_collision := false  ## Adds a StaticBody3D trimesh. Nothing uses it; it only costs startup time and memory.
 @export var u_step := 1.0
 @export var face_rows := 50              ## Rows from trough to lip.
 @export var flat_rows := 0               ## Rows of flat water in front of the trough. 0: the ocean is that water, so there is no seam.
 @export var curl_rows := 24              ## Rows for the folding lip above the face.
+@export var back_rows := 10              ## Rows down the back of the wave, crest to sea level. Visual only.
 @export var face_color := Color(0.15, 0.45, 0.75)
 @export var water_scroll := Vector2(0.0, -0.06)   ## UV drift per second. Water draws up the face on a real wave.
 @export var band_length := 5.0           ## World-anchored shade bands every N metres along the wave, so the rider's travel reads.
@@ -246,6 +247,30 @@ func _build_face(dir: int, mi: MeshInstance3D) -> MeshInstance3D:
 			else:
 				st.add_index(a); st.add_index(c); st.add_index(b)
 				st.add_index(b); st.add_index(c); st.add_index(e)
+	# The back of the wave: a second strip from the lip line over the crest and down to sea level behind it.
+	# Same surface and material, so it is still one draw call. Alpha carries crest (1) to foot (0).
+	var base := (nu + 1) * stride
+	for i in range(nu + 1):
+		var d := minf(-shape.back_extent + i * u_step, shape.length)
+		for k in range(back_rows + 1):
+			var t := float(k) / back_rows
+			var p := shape.back_point(d, t)
+			st.set_color(Color(shape.foam_amount(d, 1.0), 0.0, 0.0, 1.0 - t))
+			st.add_vertex(Vector3(p.x * dir, p.y, p.z))
+	var bstride := back_rows + 1
+	for i in range(nu):
+		for k in range(back_rows):
+			var a := base + i * bstride + k
+			var b := a + 1
+			var c := a + bstride
+			var e := c + 1
+			# Rows run away from the viewer here, so the winding is the mirror of the face's.
+			if dir > 0:
+				st.add_index(a); st.add_index(c); st.add_index(b)
+				st.add_index(b); st.add_index(c); st.add_index(e)
+			else:
+				st.add_index(a); st.add_index(b); st.add_index(c)
+				st.add_index(b); st.add_index(e); st.add_index(c)
 	st.generate_normals()
 	mi.mesh = st.commit()
 	if _face_mat == null:

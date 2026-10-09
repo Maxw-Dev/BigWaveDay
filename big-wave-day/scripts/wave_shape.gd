@@ -34,6 +34,10 @@ extends Resource
 @export var section_angle_deg := 7.0                     ## Steepness varies by this many degrees along the wave.
 @export var section_length := 30.0                       ## Metres per main section.
 
+@export_group("Back")
+@export var back_ratio := 1.4                            ## The back of the wave runs this many lip heights behind the crest before reaching sea level.
+@export var crest_lift := 0.35                           ## The crest rounds over this high above the lip line before falling away behind it.
+
 @export_group("Extents")
 @export var length := 400.0                              ## Metres of wave rendered ahead of the break.
 @export var back_extent := 40.0                          ## Metres rendered behind the break.
@@ -124,6 +128,18 @@ func _curl_point(d: float, phi: float) -> Vector3:
 	var centre := Vector2(lip.z, lip.y) + curl_radius * Vector2(sin(a), cos(a))
 	var p := centre + curl_radius * Vector2(-sin(a + phi), -cos(a + phi))
 	return Vector3(d, p.y, p.x)
+
+
+func back_point(d: float, t: float) -> Vector3:
+	# The back of the wave, t = 0 at the lip line to 1 at sea level behind it: leaves the crest level, rounds
+	# over, and rolls down. Visual only; nothing is ridden here. Starts straight back so it clears the
+	# whitewater half-pipe behind the break, whose face bulges back further than its top.
+	var root := local_point(d, 1.0)
+	# Behind the break the whitewater pile is lower and shorter-backed than the wave was.
+	var width := maxf(lip_height(d) * back_ratio * lerpf(1.0, 0.55, broken(d)), 0.3)
+	var y := root.y * (0.5 + 0.5 * cos(PI * t)) + crest_lift * sin(PI * t) * (1.0 - t)
+	var z := root.z - width * sin(PI * t * 0.5)
+	return Vector3(d, y, z)
 
 
 func top_height(d: float) -> float:
