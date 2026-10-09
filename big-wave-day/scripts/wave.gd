@@ -23,6 +23,12 @@ extends Node3D
 const FACE_SHADER := preload("res://shaders/water_face.gdshader")
 const OCEAN_SHADER := preload("res://shaders/water_ocean.gdshader")
 
+@export_group("Catch-up")
+@export var catch_up_start := 28.0       ## Metres ahead of the break where it starts speeding up to stay with you...
+@export var catch_up_full := 40.0        ## ...and where the extra speed is at its maximum. Keeps the action in the pocket; never punishes speed.
+@export var catch_up_max := 2.5          ## m/s of extra peel speed at most.
+@export var catch_up_cap := 40.0         ## On a timed wave the break may gain at most this many metres this way, so it still runs out by the island.
+@export_group("")
 @export var taper_length := 150.0        ## Metres over which the wave line runs down to nothing at end_u. Long, so the end reads as a decline, not a fin.
 @export var min_size := 0.04             ## Smallest the wave ever gets, as a fraction of full size. Avoids a zero-height face.
 
@@ -30,6 +36,8 @@ var foam_u := 0.0                        ## Position of the break along the wave
 var amplitude := 1.0                     ## 1 = full wave. The run lowers it as a timed wave runs out.
 var end_u := INF                         ## Metres along the wave where it runs out (at the island). INF = never.
 var _spray_base := Vector3.ZERO
+var _catch_up := 0.0                     ## Current extra peel speed, eased.
+var _caught_up := 0.0                    ## Extra metres gained this wave.
 var _spray_v_min := 4.0
 var _spray_v_max := 9.0
 var _faces := {}                         ## direction -> MeshInstance3D. Both are built once; only one is shown.
@@ -59,6 +67,8 @@ func _ready() -> void:
 
 
 func reset() -> void:
+	_catch_up = 0.0
+	_caught_up = 0.0
 	foam_u = 0.0
 	_place()
 
@@ -123,8 +133,20 @@ func set_direction(dir: int) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	foam_u += peel_speed * delta
+	foam_u += (peel_speed + _catch_up) * delta
+	_caught_up += _catch_up * delta
 	_place()
+
+
+func rider_at(u: float, rider_speed: float, delta: float) -> void:
+	# Rubber band: a rider far ahead on the flat shoulder has nothing to do, so the break speeds up until the
+	# pocket is back under them. Eased over about half a second so it is never felt as a jolt.
+	# Only for a rider who is pulling away. One who has slowed keeps the full gap to recover in.
+	var pulling := smoothstep(peel_speed - 0.5, peel_speed + 1.5, rider_speed)
+	var target := catch_up_max * smoothstep(catch_up_start, catch_up_full, u - foam_u) * pulling
+	if end_u != INF and _caught_up >= catch_up_cap:
+		target = 0.0
+	_catch_up = lerpf(_catch_up, target, 1.0 - exp(-2.0 * delta))
 
 
 func _process(delta: float) -> void:

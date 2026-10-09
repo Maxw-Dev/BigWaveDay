@@ -17,7 +17,7 @@ enum State { TITLE, RIDING, ENDING, REPLAY, CARD, STARTING }
 @export_group("Wave ending")
 @export var wave_fade_seconds := 8.0  ## Over the last this-many seconds of a timed wave, the whole wave shrinks...
 @export var wave_end_size := 0.18     ## ...down to this fraction of its full size.
-@export var wave_end_margin := 120.0  ## The wave line runs out this many metres past where the break will be at the end. With the 150 m taper, a rider
+@export var wave_end_margin := 160.0  ## The wave line runs out this many metres past where the break will be at the end. With the 150 m taper, a rider
 									  ## far down the line only meets the shrinking part in the last ~11 s.
 @export var died_size := 0.5          ## Bogging where the wave is smaller than this counts as the wave ending, not a wipeout.
 
@@ -151,6 +151,9 @@ func _physics_process(delta: float) -> void:
 		var k := clampf(1.0 - time_left / wave_fade_seconds, 0.0, 1.0)
 		wave.set_size(lerpf(1.0, wave_end_size, smoothstep(0.0, 1.0, k)))
 		camera.outro = clampf(k * 2.0, 0.0, 1.0)   # pulled out to the wide shot by halfway through the fade
+	wave.rider_at(surfer.pos.x, surfer.speed(), delta)
+	if backdrop != null:
+		backdrop.stream(surfer.global_position.x, wave.direction)
 	_track_highlights(delta)
 	_record_frame()
 	var reason := ""

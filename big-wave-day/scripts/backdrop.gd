@@ -12,6 +12,9 @@ extends Node3D
 @export var home_out := 78.0                         ## ...and this far out toward the shore (+z), clear of the wave.
 @export var endless_home_u := 650.0                  ## In endless mode the wave never runs out; the island just sits far down the line.
 @export var shallow_radius := Vector2(110.0, 115.0)  ## Size of the see-through shallows around the home island (along, out).
+@export var chain_count := 7                         ## Islands streamed along the coast, so endless mode never runs out of land ahead.
+@export var chain_spacing := Vector2(240.0, 400.0)   ## Metres between chain islands (min, max).
+@export var chain_behind := 320.0                    ## A chain island this far behind the rider moves to the front of the chain.
 
 ## Background islets: (metres along the wave, metres out (+ shore side, - behind the wave), size). Mirrored with the wave.
 const ISLETS := [
@@ -47,6 +50,9 @@ var _reef: MeshInstance3D
 var _islets: Array[MeshInstance3D] = []
 var _stacks: Array[MeshInstance3D] = []
 var _boats: Array[Node3D] = []
+var _chain: Array[MeshInstance3D] = []
+var _chain_front := 0.0                  ## Along-the-wave position (unsigned) of the furthest chain island.
+var _rng := RandomNumberGenerator.new()
 var _t := 0.0
 
 
@@ -61,6 +67,11 @@ func _ready() -> void:
 		_islets.append(_instance(_build_island(spec.z, spec.z * 0.28, clampi(int(spec.z / 9.0), 1, 4), 4, 100 + i)))
 	for i in range(STACKS.size()):
 		_stacks.append(_instance(_build_stack(STACKS[i].z, 200 + i)))
+	# The chain: a mix of sizes, a couple of low sandbars, one big one.
+	var specs := [[26.0, 7.0, 4], [18.0, 1.0, 1], [34.0, 9.5, 6], [22.0, 5.5, 3], [40.0, 12.0, 8], [16.0, 0.6, 0], [30.0, 8.0, 5]]
+	for i in range(chain_count):
+		var sp: Array = specs[i % specs.size()]
+		_chain.append(_instance(_build_island(sp[0], sp[1], sp[2], 3 + i % 5, 300 + i)))
 	if boat_scene != null:
 		for i in range(2):
 			var b: Node3D = boat_scene.instantiate()
@@ -92,11 +103,34 @@ func arrange(dir: int, end_u: float, endless: bool) -> void:
 		_islets[i].rotation.y = 0.0 if dir > 0 else PI
 	for i in range(_stacks.size()):
 		_stacks[i].position = Vector3(STACKS[i].x * dir, 0.0, STACKS[i].y)
+	# The chain starts beyond the home island (timed) or a little way down the line (endless), both sides of the wave.
+	_rng.seed = 7
+	_chain_front = 330.0 if (endless or end_u == INF) else end_u + 220.0
+	for i in range(_chain.size()):
+		_place_chain(i, dir, _chain_front)
+		_chain_front += _rng.randf_range(chain_spacing.x, chain_spacing.y)
 	# One dinghy moored off the home island, one further up the coast.
 	var spots := [Vector2(home_u - 30.0, home_out - home_radius * 0.8 - 6.0), Vector2(home_u + 45.0, home_out - 10.0)]
 	for i in range(_boats.size()):
 		_boats[i].position = Vector3(spots[i].x * dir, 0.0, spots[i].y)
 		_boats[i].rotation.y = (0.7 + i * 1.9) * dir
+
+
+func stream(rider_x: float, dir: int) -> void:
+	# Keep the chain ahead of the rider: anything left far behind goes to the front with a fresh spot.
+	for i in range(_chain.size()):
+		if (rider_x - _chain[i].position.x) * dir > chain_behind:
+			_chain_front += _rng.randf_range(chain_spacing.x, chain_spacing.y)
+			_place_chain(i, dir, _chain_front)
+
+
+func _place_chain(i: int, dir: int, u: float) -> void:
+	# Alternating sides with some scatter: the shore side (+z) beyond the home island's lane, or behind the wave,
+	# where it shows over the shoulder.
+	var shore := (i % 2 == 0) == (_rng.randf() < 0.8)
+	var z := _rng.randf_range(150.0, 250.0) if shore else -_rng.randf_range(170.0, 300.0)
+	_chain[i].position = Vector3(u * dir, 0.0, z)
+	_chain[i].rotation.y = (0.0 if dir > 0 else PI) + _rng.randf_range(-0.6, 0.6)
 
 
 func shallows_center() -> Vector3:
